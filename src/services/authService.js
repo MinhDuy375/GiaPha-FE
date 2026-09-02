@@ -1,4 +1,4 @@
-﻿import api from './api';
+import api from './api';
 
 const authService = {
   login: async (emailOrUsername, password) => {
@@ -11,20 +11,24 @@ const authService = {
     return response.data;
   },
 
-  register: async (username, email, password, defaultFamilyTreeName) => {
-    const response = await api.post('/auth/register', {
-      username,
-      email,
-      password,
-      defaultFamilyTreeName
-    });
+  register: async (fullName, email, password) => {
+    const response = await api.post('/auth/register', { fullName, email, password });
+    return response.data;
+  },
+
+  forgotPassword: async (email) => {
+    const response = await api.post('/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  changePassword: async (oldPassword, newPassword) => {
+    const response = await api.post('/auth/change-password', { oldPassword, newPassword });
     return response.data;
   },
 
   selectTree: async (familyTreeId) => {
     const response = await api.post('/auth/select-tree', { familyTreeId });
     if (response.data.accessToken) {
-      // Ghi đè accessToken hiện tại bằng JWT#2 (token chứa family_tree_id và permissions)
       localStorage.setItem('accessToken', response.data.accessToken);
       localStorage.setItem('currentFamilyTreeId', familyTreeId);
       localStorage.setItem('role', response.data.role);
@@ -48,7 +52,7 @@ const authService = {
   },
 
   getRole: () => localStorage.getItem('role'),
-  
+
   getPermissions: () => {
     const permsStr = localStorage.getItem('permissions');
     return permsStr ? JSON.parse(permsStr) : [];

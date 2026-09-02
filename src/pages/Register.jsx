@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -46,7 +46,7 @@ const IconCheck = () => (
 );
 
 export default function Register() {
-  const [form, setForm] = useState({ username: "", email: "", password: "", defaultFamilyTreeName: "" });
+  const [form, setForm] = useState({ fullName: "", email: "", password: "" });
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -58,14 +58,14 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.username.trim() || !form.email || !form.password) return;
+    if (!form.fullName.trim() || !form.email || !form.password) return;
     setError(""); setLoading(true);
     try {
-      await register(form.username, form.email, form.password, form.defaultFamilyTreeName);
+      await register(form.fullName, form.email, form.password);
       setSuccess(true);
       setTimeout(() => navigate("/login"), 2200);
     } catch (err) {
-      setError(err.response?.data?.message || "Dang ky that bai. Vui long kiem tra lai.");
+      setError(err.response?.data?.message || "Đăng ký thất bại. Vui lòng kiểm tra lại.");
     } finally {
       setLoading(false);
     }
@@ -85,13 +85,13 @@ export default function Register() {
               <circle cx="28" cy="46" r="3" fill="white"/>
             </svg>
           </div>
-          <p className="auth-visual-title">Bat dau hanh trinh<br/>tim ve coi nguon</p>
+          <p className="auth-visual-title">Bắt đầu hành trình<br/>tìm về cội nguồn</p>
           <p className="auth-visual-sub">
-            Tao tai khoan trong vai phut. He thong se tu dong khoi tao<br/>
-            mot cay gia pha dau tien cho dong ho cua ban.
+            Tạo tài khoản trong vài phút. Hệ thống sẽ giúp bạn<br/>
+            bắt đầu quản lý dòng họ của mình.
           </p>
           <div style={{ marginTop: "40px" }}>
-            {["Luu tru lich su dong ho", "Ket noi nhieu the he", "Xuat PDF gia pha dep", "Quan ly quyen han linh hoat"].map((item) => (
+            {["Lưu trữ lịch sử dòng họ", "Kết nối nhiều thế hệ", "Xuất PDF gia phả đẹp", "Quản lý quyền hạn linh hoạt"].map((item) => (
               <div key={item} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px", color: "rgba(255,255,255,0.85)", fontSize: "0.9375rem" }}>
                 <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
@@ -105,9 +105,9 @@ export default function Register() {
 
       <div className="auth-form-side">
         <div className="auth-card">
-          <p className="auth-logo">Lac Viet Gia Pha</p>
-          <h1 className="auth-headline">Tao tai khoan</h1>
-          <p className="auth-subline">Dien thong tin ben duoi de khoi tao hanh trinh giu gin ky uc dong ho.</p>
+          <p className="auth-logo">Lạc Việt Gia Phả</p>
+          <h1 className="auth-headline">Tạo tài khoản</h1>
+          <p className="auth-subline">Điền thông tin bên dưới để khởi tạo hành trình giữ gìn ký ức dòng họ.</p>
 
           {error && (
             <div className="alert alert-error" role="alert" aria-live="assertive">
@@ -116,17 +116,17 @@ export default function Register() {
           )}
           {success && (
             <div className="alert alert-success" role="status" aria-live="polite">
-              <IconCheck /><span>Dang ky thanh cong! Dang chuyen huong...</span>
+              <IconCheck /><span>Đăng ký thành công! Đang chuyển hướng...</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} noValidate>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label" htmlFor="reg-username">Ten tai khoan *</label>
+                <label className="form-label" htmlFor="reg-fullname">Tên gọi của bạn *</label>
                 <div className="form-input-wrapper">
                   <span className="form-input-icon"><IconUser /></span>
-                  <input id="reg-username" type="text" className="form-input" placeholder="username" value={form.username} onChange={set("username")} autoComplete="username" required aria-required="true" />
+                  <input id="reg-fullname" type="text" className="form-input" placeholder="Nguyễn Văn A" value={form.fullName} onChange={set("fullName")} autoComplete="name" required aria-required="true" />
                 </div>
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
@@ -139,37 +139,27 @@ export default function Register() {
             </div>
 
             <div className="form-group" style={{ marginTop: "16px" }}>
-              <label className="form-label" htmlFor="reg-password">Mat khau *</label>
+              <label className="form-label" htmlFor="reg-password">Mật khẩu *</label>
               <div className="form-input-wrapper">
                 <span className="form-input-icon"><IconLock /></span>
                 <input id="reg-password" type={showPw ? "text" : "password"} className="form-input has-suffix"
-                  placeholder="Toi thieu 6 ky tu..." value={form.password} onChange={set("password")} autoComplete="new-password" required aria-required="true" />
+                  placeholder="Tối thiểu 6 ký tự..." value={form.password} onChange={set("password")} autoComplete="new-password" required aria-required="true" />
                 <button type="button" className="form-input-suffix" onClick={() => setShowPw(!showPw)}
-                  aria-label={showPw ? "An mat khau" : "Hien mat khau"}>
+                  aria-label={showPw ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
                   {showPw ? <IconEyeOff /> : <IconEye />}
                 </button>
               </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label" htmlFor="reg-tree">Ten gia pha (Tuy chon)</label>
-              <div className="form-input-wrapper">
-                <span className="form-input-icon"><IconTree /></span>
-                <input id="reg-tree" type="text" className="form-input" placeholder="VD: Gia pha ho Nguyen Van..."
-                  value={form.defaultFamilyTreeName} onChange={set("defaultFamilyTreeName")} />
-              </div>
-              <p className="form-helper">He thong se tu tao 1 gia pha mac dinh neu ban bo trong.</p>
-            </div>
-
             <button type="submit" id="btn-register" className="btn btn-primary btn-full btn-lg" disabled={loading || success}>
-              {loading ? <span className="spinner" aria-label="Dang xu ly..." /> : "Tao tai khoan"}
+              {loading ? <span className="spinner" aria-label="Đang xử lý..." /> : "Tạo tài khoản"}
             </button>
           </form>
 
-          <div className="divider-label">hoac</div>
+          <div className="divider-label">hoặc</div>
           <div style={{ textAlign: "center", fontSize: "0.9375rem", color: "var(--color-text-secondary)" }}>
-            Da co tai khoan?{" "}
-            <Link to="/login" style={{ color: "var(--color-primary)", fontWeight: 600 }}>Dang nhap</Link>
+            Đã có tài khoản?{" "}
+            <Link to="/login" style={{ color: "var(--color-primary)", fontWeight: 600 }}>Đăng nhập</Link>
           </div>
         </div>
       </div>

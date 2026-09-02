@@ -7,6 +7,8 @@ const api = axios.create({
   },
 });
 
+export const API_ORIGIN = 'http://localhost:5082';
+
 // Interceptor đính kèm Token vào Header của mọi request
 api.interceptors.request.use(
   (config) => {
@@ -24,10 +26,10 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      
+
       try {
         const refreshToken = localStorage.getItem('refreshToken');
         if (!refreshToken) {
@@ -39,10 +41,10 @@ api.interceptors.response.use(
         });
 
         const { accessToken, refreshToken: newRefreshToken } = response.data;
-        
+
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('refreshToken', newRefreshToken);
-        
+
         originalRequest.headers.Authorization = 'Bearer ' + accessToken;
         return api(originalRequest);
       } catch (refreshError) {
@@ -52,7 +54,7 @@ api.interceptors.response.use(
         return Promise.reject(refreshError);
       }
     }
-    
+
     return Promise.reject(error);
   }
 );

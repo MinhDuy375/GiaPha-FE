@@ -1,175 +1,162 @@
-﻿import React from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useFamilyTree } from "../contexts/FamilyTreeContext";
+import Navbar from "../components/Navbar";
+import eventService from "../services/eventService";
 
 const IconFamily = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-    <circle cx="9" cy="7" r="4"/>
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
 );
 const IconTree = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 22V12M12 12 5 7M12 12l7-5M5 7V4M19 7V4"/>
+    <path d="M12 22V12M12 12 5 7M12 12l7-5M5 7V4M19 7V4" />
   </svg>
 );
 const IconShield = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
   </svg>
 );
 const IconDownload = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-    <polyline points="7 10 12 15 17 10"/>
-    <line x1="12" y1="15" x2="12" y2="3"/>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
   </svg>
 );
 const IconCheck = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12"/>
+    <polyline points="20 6 9 17 4 12" />
   </svg>
 );
 const IconUsers = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-    <circle cx="9" cy="7" r="4"/>
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
 );
 const IconSettings = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="3"/>
-    <path d="M19.07 4.93A10 10 0 1 0 4.93 19.07 10 10 0 0 0 19.07 4.93"/>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.07 4.93A10 10 0 1 0 4.93 19.07 10 10 0 0 0 19.07 4.93" />
   </svg>
 );
 const IconSwap = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="17 1 21 5 17 9"/>
-    <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-    <polyline points="7 23 3 19 7 15"/>
-    <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-  </svg>
-);
-const IconLogout = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-    <polyline points="16 17 21 12 16 7"/>
-    <line x1="21" y1="12" x2="9" y2="12"/>
+    <polyline points="17 1 21 5 17 9" />
+    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+    <polyline points="7 23 3 19 7 15" />
+    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
   </svg>
 );
 
 const features = [
   {
-    icon: <IconTree />, iconClass: "", title: "Cay Gia Pha",
-    desc: "Xem so do phat do truc quan theo tung the he. Phong to, thu nho va tuong tac truc tiep tren cay.",
-    perm: "tree.view", action: "Xem gia pha",
+    icon: <IconTree />, iconClass: "", title: "Cây Gia Phả",
+    desc: "Xem sơ đồ phát đồ trực quan theo từng thế hệ. Phóng to, thu nhỏ và tương tác trực tiếp trên cây.",
+    perm: "tree_view.view", action: "Xem gia phả", to: "/family-tree",
   },
   {
-    icon: <IconFamily />, iconClass: "", title: "Quan ly Thanh Vien",
-    desc: "Them, sua, xoa thong tin ca nhan: tieu su, ngay sinh, nghe nghiep, hinh anh.",
-    perm: "member.view", action: "Xem thanh vien",
+    icon: <IconFamily />, iconClass: "", title: "Quản lý Thành Viên",
+    desc: "Thêm, sửa, xóa thông tin cá nhân: tiểu sử, ngày sinh, nghề nghiệp, hình ảnh.",
+    perm: "member_list.view", action: "Xem thành viên", to: "/members",
   },
   {
-    icon: <IconDownload />, iconClass: "feature-icon--teal", title: "Nhap / Xuat Du lieu",
-    desc: "Nhap hang loat tu Excel/GEDCOM hoac xuat gia pha ra PDF / hinh anh chat luong cao.",
-    perm: "data.import", action: "Nhap xuat",
+    icon: <IconUsers />, iconClass: "feature-icon--amber", title: "Quản lý Quan hệ",
+    desc: "Quản lý quan hệ cha mẹ, con nuôi và vợ chồng trong cây gia phả.",
+    perm: "member_list.view", action: "Xem quan hệ", to: "/relationships",
   },
   {
-    icon: <IconCheck />, iconClass: "feature-icon--teal", title: "Phe Duyet Dong Gop",
-    desc: "Xem xet va duyet cac de xuat bo sung, sua doi tu con chau truoc khi cap nhat chinh thuc.",
-    perm: "data.approve", action: "Xet duyet",
+    icon: <IconTree />, iconClass: "feature-icon--teal", title: "Thống kê Dòng họ",
+    desc: "Theo dõi số lượng thành viên, thế hệ, giới tính và phân bố năm sinh.",
+    perm: "tree_view.view", action: "Xem thống kê", to: "/statistics",
   },
   {
-    icon: <IconUsers />, iconClass: "feature-icon--amber", title: "Thanh Vien Dong Ho",
-    desc: "Moi thanh vien moi, quan ly quyen tham gia va thu hoi quyen truy cap.",
-    perm: "membership.manage", action: "Quan ly",
+    icon: <IconCheck />, iconClass: "feature-icon--amber", title: "Sự kiện Dòng họ",
+    desc: "Theo dõi ngày giỗ, sinh nhật và các sự kiện quan trọng của dòng họ.",
+    perm: "event.view", action: "Xem sự kiện", to: "/events",
   },
   {
-    icon: <IconSettings />, iconClass: "feature-icon--amber", title: "Phan Quyen & Cai dat",
-    desc: "Cau hinh vai tro Admin / Editor / Viewer va chinh sach quyen han trong dong ho.",
-    perm: "role.manage", action: "Cai dat",
+    icon: <IconUsers />, iconClass: "feature-icon--teal", title: "Tra cứu Danh xưng",
+    desc: "Xác định cách xưng hô và liên kết giữa hai thành viên trong dòng tộc.",
+    perm: "kinship.view", action: "Tra cứu", to: "/kinship",
+  },
+  {
+    icon: <IconFamily />, iconClass: "feature-icon--amber", title: "Thư viện Dòng họ",
+    desc: "Lưu giữ ảnh, câu chuyện và ghi chú về những kỷ niệm của dòng họ.",
+    perm: "gallery.view", action: "Mở thư viện", to: "/gallery",
+  },
+  {
+    icon: <IconUsers />, iconClass: "feature-icon--teal", title: "Tham gia Gia tộc",
+    desc: "Tham gia gia tộc bằng mã, quản lý các gia tộc của bạn và duyệt yêu cầu thành viên.",
+    perm: "membership.view", action: "Mở quản lý", to: "/membership",
+  },
+  {
+    icon: <IconDownload />, iconClass: "feature-icon--teal", title: "Nhập / Xuất Dữ liệu",
+    desc: "Nhập hàng loạt từ Excel/GEDCOM hoặc xuất gia phả ra PDF / hình ảnh chất lượng cao.",
+    perm: "tree_view.export", action: "Nhập xuất", to: null,
+  },
+  {
+    icon: <IconCheck />, iconClass: "feature-icon--teal", title: "Phê Duyệt Đóng Góp",
+    desc: "Xem xét và duyệt các đề xuất bổ sung, sửa đổi từ con cháu trước khi cập nhật chính thức.",
+    perm: "membership.manage", action: "Xét duyệt", to: null,
+  },
+  {
+    icon: <IconUsers />, iconClass: "feature-icon--amber", title: "Thành Viên Dòng Họ",
+    desc: "Mời thành viên mới, quản lý quyền tham gia và thu hồi quyền truy cập.",
+    perm: "membership.view", action: "Quản lý", to: null,
+  },
+  {
+    icon: <IconSettings />, iconClass: "feature-icon--amber", title: "Phân Quyền & Cài đặt",
+    desc: "Cấu hình các nhóm quyền và ma trận phân quyền chuyên nghiệp cho dòng họ.",
+    perm: "role_group.view", action: "Cài đặt phân quyền", to: "/permissions",
   },
 ];
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
-  const { role, permissions, clearSelectedTree } = useFamilyTree();
+  const { role, permissions } = useFamilyTree();
   const navigate = useNavigate();
+  const [events, setEvents] = React.useState([]);
 
   const has = (perm) => permissions?.includes(perm);
 
-  const roleChipClass = role === "Admin" ? "chip chip-primary" : role === "Editor" ? "chip chip-amber" : "chip chip-green";
+  const roleChipClass = role === 'Quản trị viên' ? 'chip chip-primary' : role === 'Người biên tập' ? 'chip chip-amber' : 'chip chip-green';
 
-  const handleSwitchTree = () => {
-    clearSelectedTree();
-    navigate("/select-tree");
-  };
+
+  React.useEffect(() => {
+    if (!has('event.view')) return;
+    eventService.getEvents().then(setEvents).catch(() => setEvents([]));
+  }, [permissions]);
+
+  const today = new Date();
+  const upcomingEvents = events.filter(event => new Date(event.eventDate) >= new Date(today.getFullYear(), today.getMonth(), today.getDate())).slice(0, 4);
 
   return (
     <div className="page">
       {/* Navbar */}
-      <nav className="navbar" aria-label="Main navigation">
-        <div className="navbar-inner">
-          <div className="navbar-brand">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22V12M12 12 5 7M12 12l7-5M5 7V4M19 7V4"/>
-            </svg>
-            Lac Viet Gia Pha
-          </div>
-          <div className="navbar-actions">
-            <div className="navbar-user">
-              <div className="navbar-avatar" aria-label={"User " + user?.username}>
-                {user?.username?.charAt(0).toUpperCase()}
-              </div>
-              <span style={{ fontWeight: 500, fontSize: "0.9rem" }}>{user?.username}</span>
-              <span className={roleChipClass}>{role}</span>
-            </div>
-            <button className="btn btn-secondary btn-sm" onClick={handleSwitchTree} id="btn-switch-tree">
-              <IconSwap /> Doi dong ho
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={logout} aria-label="Dang xuat">
-              <IconLogout />
-            </button>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       <main className="page-content">
         {/* Welcome banner */}
-        <div style={{
-          background: "linear-gradient(135deg, var(--color-primary) 0%, #8c3212 60%, #3b2d1a 100%)",
-          borderRadius: "var(--radius-xl)",
-          padding: "36px 40px",
-          marginBottom: "40px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: "24px",
-          position: "relative",
-          overflow: "hidden",
-        }}>
-          <div style={{ position: "absolute", inset: 0, opacity: 0.06, backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23fff' fill-opacity='1' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='3'/%3E%3Ccircle cx='13' cy='13' r='3'/%3E%3C/g%3E%3C/svg%3E\")" }} />
-          <div style={{ position: "relative" }}>
-            <p style={{ fontSize: "0.875rem", color: "rgba(255,255,255,0.65)", fontWeight: 500, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-              Bang Dieu Khien
-            </p>
-            <h1 style={{ fontFamily: "var(--font-display)", fontSize: "2rem", fontWeight: 800, color: "white", lineHeight: 1.2, marginBottom: "12px" }}>
-              Chao mung tro lai, {user?.username}!
-            </h1>
-            <p style={{ color: "rgba(255,255,255,0.75)", fontSize: "1rem", lineHeight: 1.5, maxWidth: "480px" }}>
-              Quan ly dong ho, them thanh vien va giu gin ky uc to tien cua ban.
-            </p>
+
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 0.8fr) minmax(300px, 1.2fr)", gap: 16, marginBottom: 32 }}>
+          <div className="card" style={{ padding: 22 }}>
+            <div style={{ color: "var(--color-text-muted)", fontSize: "0.76rem", fontWeight: 700, textTransform: "uppercase" }}>Hôm nay</div>
+            <div style={{ fontSize: "1.45rem", fontWeight: 800, marginTop: 8 }}>{today.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
+            <div style={{ color: "var(--color-text-muted)", marginTop: 6 }}>Dương lịch · Âm lịch xem trong hồ sơ thành viên</div>
           </div>
-          <div style={{ position: "relative", background: "rgba(255,255,255,0.12)", borderRadius: "var(--radius-lg)", padding: "20px 28px", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.15)" }}>
-            <div style={{ fontSize: "0.8125rem", color: "rgba(255,255,255,0.65)", marginBottom: "4px" }}>Vai tro hien tai</div>
-            <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "white" }}>{role}</div>
-            <div style={{ fontSize: "0.8125rem", color: "rgba(255,255,255,0.55)", marginTop: "4px" }}>{permissions?.length || 0} quyen han</div>
+          <div className="card" style={{ padding: 22 }}>
+            <div style={{ color: "var(--color-text-muted)", fontSize: "0.76rem", fontWeight: 700, textTransform: "uppercase" }}>Sự kiện hôm nay và sắp tới</div>
+            {upcomingEvents.length ? upcomingEvents.map(event => <div key={event.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: "1px solid var(--color-border)" }}><span style={{ fontWeight: 650 }}>{event.title}</span><span style={{ color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>{new Date(event.eventDate).toLocaleDateString('vi-VN')}</span></div>) : <div style={{ color: "var(--color-text-muted)", marginTop: 10 }}>Chưa có sự kiện sắp tới.</div>}
           </div>
         </div>
 
@@ -184,39 +171,19 @@ export default function Dashboard() {
           {features.map((feat) => {
             const allowed = has(feat.perm);
             return (
-              <div key={feat.perm} className={"feature-card" + (allowed ? "" : " feature-card--disabled")}>
+              <div key={`${feat.perm}-${feat.to || feat.title}`} className={"feature-card" + (allowed ? "" : " feature-card--disabled")} role={allowed && feat.to ? "button" : undefined} tabIndex={allowed && feat.to ? 0 : undefined} onClick={() => allowed && feat.to && navigate(feat.to)} onKeyDown={(event) => { if (event.key === 'Enter' && allowed && feat.to) navigate(feat.to); }} style={{ cursor: allowed && feat.to ? 'pointer' : 'default' }}>
                 <div className={"feature-icon " + feat.iconClass} aria-hidden="true">
                   {feat.icon}
                 </div>
                 <h3 className="feature-title">{feat.title}</h3>
                 <p className="feature-desc">{feat.desc}</p>
-                <button
-                  className={"btn btn-sm " + (allowed ? "btn-primary" : "btn-secondary")}
-                  disabled={!allowed}
-                  aria-label={(allowed ? feat.action : "Khong co quyen: ") + feat.title}
-                  id={"btn-feat-" + feat.perm.replace(".", "-")}
-                  style={!allowed ? { cursor: "not-allowed" } : {}}
-                >
-                  {allowed ? feat.action : "Khong du quyen"}
-                </button>
+                <div style={{ marginTop: 12, color: allowed ? 'var(--color-primary)' : 'var(--color-text-muted)', fontSize: '0.8rem', fontWeight: 700 }}>{allowed ? `Mở ${feat.title} →` : "Không đủ quyền"}</div>
               </div>
             );
           })}
         </div>
 
-        {/* Permissions summary */}
-        <div className="card" style={{ padding: "24px" }}>
-          <h3 style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "16px" }}>
-            Danh sach quyen han trong phien nay
-          </h3>
-          <div className="perm-list" role="list" aria-label="Danh sach quyen han">
-            {permissions?.length > 0 ? permissions.map((perm) => (
-              <span key={perm} className="perm-tag" role="listitem">{perm}</span>
-            )) : (
-              <span style={{ color: "var(--color-text-muted)", fontSize: "0.875rem" }}>Khong co quyen han nao.</span>
-            )}
-          </div>
-        </div>
+
       </main>
     </div>
   );
