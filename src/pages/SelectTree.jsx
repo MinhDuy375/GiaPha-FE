@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFamilyTree } from "../contexts/FamilyTreeContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -72,7 +72,7 @@ export default function SelectTree() {
       const data = await familyTreeService.getMyTrees();
       setTrees(data);
     } catch {
-      setError("Khong the tai danh sach gia pha.");
+      setError("Không thể tải danh sách gia phả.");
     } finally {
       setLoading(false);
     }
@@ -83,7 +83,7 @@ export default function SelectTree() {
       await selectTree(treeId);
       navigate("/");
     } catch {
-      setError("Co loi xay ra khi truy cap dong ho nay.");
+      setError("Có lỗi xảy ra khi truy cập dòng họ này.");
     }
   };
 
@@ -97,7 +97,7 @@ export default function SelectTree() {
       setNewName(""); setNewDesc("");
       fetchTrees();
     } catch {
-      setError("Khong the tao gia pha moi.");
+      setError("Không thể tạo gia phả mới.");
     } finally {
       setCreateLoading(false);
     }

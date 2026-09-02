@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -30,7 +30,7 @@ const IconAlert = () => (
 );
 
 export default function Login() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
@@ -40,13 +40,19 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!username.trim() || !password) return;
+    if (!email.trim() || !password) return;
     setError(""); setLoading(true);
     try {
-      await login(username, password);
-      navigate("/select-tree");
+      const data = await login(email, password);
+      if (data.user.mustChangePassword) {
+        navigate("/change-password");
+      } else if (!data.familyTrees || data.familyTrees.length === 0) {
+        navigate("/onboarding");
+      } else {
+        navigate("/select-tree");
+      }
     } catch (err) {
-      setError(err.response?.data?.message || "Ten tai khoan hoac mat khau khong dung.");
+      setError(err.response?.data?.message || "Email hoặc mật khẩu không đúng.");
     } finally {
       setLoading(false);
     }
@@ -66,13 +72,13 @@ export default function Login() {
               <circle cx="28" cy="46" r="3" fill="white"/>
             </svg>
           </div>
-          <p className="auth-visual-title">Luu giu<br/>ky uc dong ho</p>
+          <p className="auth-visual-title">Lưu giữ<br/>ký ức dòng họ</p>
           <p className="auth-visual-sub">
-            Gia pha so hoa giup cac the he con chau ket noi,<br/>
-            tim ve coi nguon va gin giu van hoa to tien.
+            Gia phả số hóa giúp các thế hệ con cháu kết nối,<br/>
+            tìm về cội nguồn và gìn giữ văn hóa tổ tiên.
           </p>
           <div style={{ marginTop: "48px", display: "flex", gap: "24px" }}>
-            {[["500+", "Dong ho"], ["10K+", "Thanh vien"], ["50+", "Tinh thanh"]].map(([n, l]) => (
+            {[["500+", "Dòng họ"], ["10K+", "Thành viên"], ["50+", "Tỉnh thành"]].map(([n, l]) => (
               <div key={l}>
                 <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "white" }}>{n}</div>
                 <div style={{ fontSize: "0.8125rem", color: "rgba(255,255,255,0.6)", marginTop: "2px" }}>{l}</div>
@@ -83,9 +89,9 @@ export default function Login() {
       </aside>
       <div className="auth-form-side">
         <div className="auth-card">
-          <p className="auth-logo">Lac Viet Gia Pha</p>
-          <h1 className="auth-headline">Dang nhap</h1>
-          <p className="auth-subline">Chao mung tro lai! Nhap thong tin de tiep tuc quan ly gia pha.</p>
+          <p className="auth-logo">Lạc Việt Gia Phả</p>
+          <h1 className="auth-headline">Đăng nhập</h1>
+          <p className="auth-subline">Chào mừng trở lại! Nhập thông tin để tiếp tục quản lý gia phả.</p>
           {error && (
             <div className="alert alert-error" role="alert" aria-live="assertive">
               <IconAlert /><span>{error}</span>
@@ -93,17 +99,17 @@ export default function Login() {
           )}
           <form onSubmit={handleSubmit} noValidate>
             <div className="form-group">
-              <label className="form-label" htmlFor="login-username">Ten tai khoan</label>
+              <label className="form-label" htmlFor="login-email">Email</label>
               <div className="form-input-wrapper">
                 <span className="form-input-icon"><IconUser /></span>
-                <input id="login-username" type="text" className="form-input" placeholder="Nhap ten tai khoan..."
-                  value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required aria-required="true" />
+                <input id="login-email" type="email" className="form-input" placeholder="Nhập email..."
+                  value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required aria-required="true" />
               </div>
             </div>
             <div className="form-group">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <label className="form-label" htmlFor="login-password" style={{ marginBottom: 0 }}>Mat khau</label>
-                <a href="#" style={{ fontSize: "0.8125rem", color: "var(--color-primary)", fontWeight: 500 }}>Quen mat khau?</a>
+                <label className="form-label" htmlFor="login-password" style={{ marginBottom: 0 }}>Mật khẩu</label>
+                <Link to="/forgot-password" style={{ fontSize: "0.8125rem", color: "var(--color-primary)", fontWeight: 500 }}>Quên mật khẩu?</Link>
               </div>
               <div className="form-input-wrapper">
                 <span className="form-input-icon"><IconLock /></span>
@@ -122,8 +128,8 @@ export default function Login() {
           </form>
           <div className="divider-label">hoac</div>
           <div style={{ textAlign: "center", fontSize: "0.9375rem", color: "var(--color-text-secondary)" }}>
-            Chua co tai khoan?{" "}
-            <Link to="/register" style={{ color: "var(--color-primary)", fontWeight: 600 }}>Dang ky ngay</Link>
+            Chưa có tài khoản?{" "}
+            <Link to="/register" style={{ color: "var(--color-primary)", fontWeight: 600 }}>Đăng ký ngay</Link>
           </div>
         </div>
       </div>

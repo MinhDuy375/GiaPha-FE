@@ -1,4 +1,4 @@
-﻿import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import authService from '../services/authService';
 
 const AuthContext = createContext(null);
@@ -26,8 +26,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (username, email, password, defaultTreeName) => {
-    return await authService.register(username, email, password, defaultTreeName);
+  const register = async (fullName, email, password) => {
+    return await authService.register(fullName, email, password);
+  };
+
+  const forgotPassword = async (email) => {
+    return await authService.forgotPassword(email);
+  };
+
+  const changePassword = async (oldPassword, newPassword) => {
+    const result = await authService.changePassword(oldPassword, newPassword);
+    // Cập nhật user trong state và localStorage bỏ cờ MustChangePassword
+    const currentUser = authService.getCurrentUser();
+    if (currentUser) {
+      const updatedUser = { ...currentUser, mustChangePassword: false };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+    }
+    return result;
   };
 
   const logout = () => {
@@ -41,6 +57,8 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     register,
+    forgotPassword,
+    changePassword,
     logout
   };
 
