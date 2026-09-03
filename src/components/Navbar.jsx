@@ -90,10 +90,8 @@ export default function Navbar({ children }) {
       <nav className="navbar" aria-label="Main navigation">
         <div className="navbar-inner">
           <div className="navbar-brand" style={{ cursor: 'pointer' }} onClick={() => navigate('/')}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22V12M12 12 5 7M12 12l7-5M5 7V4M19 7V4" />
-            </svg>
-            Lạc Việt Gia Phả
+            <img src="/public/chimlactrans.png" alt="Logo" className="navbar-logo" style={{ width: '30px' }} />
+            Lạc Việt
           </div>
 
           <div className="navbar-actions">
