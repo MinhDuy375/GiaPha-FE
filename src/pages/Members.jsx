@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import memberService from '../services/memberService';
 import { useFamilyTree } from '../contexts/FamilyTreeContext';
 import { MemberFormModal } from './FamilyTree';
+import { API_ORIGIN } from '../services/api';
 
 const IconSearch = () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -33,6 +34,8 @@ export default function Members() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
+    const [editingMember, setEditingMember] = useState(null);
+    const [selectedMember, setSelectedMember] = useState(null);
 
     const loadMembers = async () => {
         setLoading(true);
@@ -75,6 +78,43 @@ export default function Members() {
         await loadMembers();
     };
 
+    const handleSave = async data => {
+        const { avatarFile, ...memberData } = data;
+        await memberService.updateMember(editingMember.id, memberData);
+        if (avatarFile) await memberService.uploadAvatar(editingMember.id, avatarFile);
+        setEditingMember(null);
+        await loadMembers();
+    };
+
+    const openEdit = member => setEditingMember({
+        ...member,
+        full_name: member.fullName,
+        birth_year: member.birthYear,
+        death_year: member.deathYear,
+        birth_month: member.birthMonth,
+        birth_day: member.birthDay,
+        death_month: member.deathMonth,
+        death_day: member.deathDay,
+        avatar_url: member.avatarUrl,
+        generation: member.generationLevel,
+        occupation: member.occupation,
+        current_residence: member.currentResidence,
+        is_in_law: member.isInLaw,
+        birth_order: member.birthOrder,
+        taboo_name: member.tabooName,
+        courtesy_name: member.courtesyName,
+        other_names: member.otherNames,
+        birth_date_lunar: member.birthDateLunar,
+        birth_lunar_year: member.birthLunarYear,
+        birth_lunar_month: member.birthLunarMonth,
+        birth_lunar_day: member.birthLunarDay,
+        death_date_lunar: member.deathDateLunar,
+        death_lunar_year: member.deathLunarYear,
+        death_lunar_month: member.deathLunarMonth,
+        death_lunar_day: member.deathLunarDay,
+        phone_number: member.phoneNumber,
+    });
+
     const exportExcel = () => {
         const rows = [['Họ và tên', 'Giới tính', 'Đời', 'Năm sinh', 'Năm mất', 'Nghề nghiệp', 'Nơi ở', 'Trạng thái'], ...filteredMembers.map(member => [member.fullName, member.gender === 0 ? 'Nam' : member.gender === 1 ? 'Nữ' : 'Khác', member.generationLevel || '', member.birthYear || '', member.deathYear || '', member.occupation || '', member.currentResidence || '', member.isAlive ? 'Còn sống' : 'Đã mất'])];
         const csv = '\ufeff' + rows.map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\r\n');
@@ -86,7 +126,7 @@ export default function Members() {
             <Navbar />
 
             <main className="page-content">
-                <div className="content-header-row"><div className="section-header"><h1 className="section-title">Danh sách thành viên</h1><p className="section-sub">Tra cứu và quản lý hồ sơ trong dòng họ hiện tại.</p></div><div className="content-header-actions"><button className="btn btn-secondary btn-sm" onClick={loadMembers}><IconRefresh /> Làm mới</button><button className="btn btn-primary btn-sm" disabled={!hasPermission('member_list.create')} onClick={() => setModalOpen(true)}><IconPlus /> Thêm thành viên</button><button className="btn btn-secondary btn-sm" disabled={!hasPermission('tree_view.export')} onClick={exportExcel}>Xuất Excel</button></div></div>
+                <div className="content-header-row"><div className="section-header"><h1 className="section-title">Danh sách thành viên</h1><p className="section-sub">Tra cứu và quản lý hồ sơ trong dòng họ hiện tại.</p></div><div className="content-header-actions"><div style={{ display: 'inline-flex', padding: 3, gap: 2, background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 8 }} role="tablist" aria-label="Chuyển chế độ xem"><button className="btn btn-ghost btn-sm" onClick={() => navigate('/family-tree')}>Cây</button><button className="btn btn-sm" style={{ background: 'var(--color-primary)', color: '#fff', border: 0 }} aria-selected="true">Danh sách</button></div><button className="btn btn-secondary btn-sm" onClick={loadMembers}><IconRefresh /> Làm mới</button><button className="btn btn-primary btn-sm" disabled={!hasPermission('member_list.create')} onClick={() => setModalOpen(true)}><IconPlus /> Thêm thành viên</button><button className="btn btn-secondary btn-sm" disabled={!hasPermission('tree_view.export')} onClick={exportExcel}>Xuất Excel</button></div></div>
 
                 <div className="card" style={{ padding: 16, marginBottom: 20 }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) repeat(3, minmax(130px, 180px))', gap: 10 }}>
@@ -111,17 +151,18 @@ export default function Members() {
                     {loading ? <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>Đang tải danh sách...</div> : (
                         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
                             <thead><tr style={{ textAlign: 'left', borderBottom: '1px solid var(--color-border)' }}>
-                                <th style={{ padding: '14px 16px' }}>Họ và tên</th><th style={{ padding: '14px 16px' }}>Giới tính</th><th style={{ padding: '14px 16px' }}>Đời</th><th style={{ padding: '14px 16px' }}>Sinh - mất</th><th style={{ padding: '14px 16px' }}>Nghề nghiệp</th><th style={{ padding: '14px 16px' }}>Trạng thái</th><th style={{ padding: '14px 16px' }}>Thao tác</th>
+                                <th style={{ padding: '14px 16px' }}>Thành viên</th><th style={{ padding: '14px 16px' }}>Giới tính</th><th style={{ padding: '14px 16px' }}>Đời</th><th style={{ padding: '14px 16px' }}>Sinh - mất</th><th style={{ padding: '14px 16px' }}>Nghề nghiệp</th><th style={{ padding: '14px 16px' }}>Ghi chú</th><th style={{ padding: '14px 16px' }}>Thao tác</th>
                             </tr></thead>
                             <tbody>{filteredMembers.map(member => <tr key={member.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                                <td style={{ padding: '13px 16px', fontWeight: 700 }}>{member.fullName}</td>
+                                <td style={{ padding: '13px 16px', fontWeight: 700 }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 34, height: 34, borderRadius: '50%', overflow: 'hidden', background: 'var(--color-surface-2)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>{member.avatarUrl ? <img src={member.avatarUrl.startsWith('http') ? member.avatarUrl : `${API_ORIGIN}${member.avatarUrl}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : member.fullName?.slice(0, 1)}</div><span>{member.fullName}</span></div></td>
                                 <td style={{ padding: '13px 16px' }}>{member.gender === 0 ? 'Nam' : member.gender === 1 ? 'Nữ' : 'Khác'}</td>
                                 <td style={{ padding: '13px 16px' }}>{member.generationLevel || 'Không rõ'}</td>
                                 <td style={{ padding: '13px 16px' }}>{member.birthYear || '?'} - {member.deathYear || (member.isAlive ? 'nay' : '?')}</td>
                                 <td style={{ padding: '13px 16px' }}>{member.occupation || 'Chưa cập nhật'}</td>
-                                <td style={{ padding: '13px 16px' }}><span className="chip">{member.isAlive ? 'Còn sống' : 'Đã mất'}</span></td>
+                                <td style={{ padding: '13px 16px', maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--color-text-secondary)' }} title={member.note || ''}>{member.note || 'Không có ghi chú'}</td>
                                 <td style={{ padding: '13px 16px', whiteSpace: 'nowrap' }}>
-                                    <button className="btn btn-secondary btn-sm" onClick={() => navigate('/family-tree')}>Xem cây</button>{' '}
+                                    <button className="btn btn-secondary btn-sm" onClick={() => setSelectedMember(member)}>Xem</button>{' '}
+                                    <button className="btn btn-secondary btn-sm" disabled={!hasPermission('member_list.edit')} onClick={() => openEdit(member)}>Sửa</button>{' '}
                                     <button className="btn btn-sm" disabled={!hasPermission('member_list.delete')} onClick={() => handleDelete(member)} style={{ color: '#ef4444' }}>Xóa</button>
                                 </td>
                             </tr>)}</tbody>
@@ -131,6 +172,8 @@ export default function Members() {
                 </div>
             </main>
             <MemberFormModal open={modalOpen} onClose={() => setModalOpen(false)} onSave={handleCreate} members={members} editingMember={null} />
+            <MemberFormModal open={Boolean(editingMember)} onClose={() => setEditingMember(null)} onSave={handleSave} members={members} editingMember={editingMember} />
+            {selectedMember && <div className="modal-overlay" role="dialog" aria-modal="true" onClick={event => event.target === event.currentTarget && setSelectedMember(null)}><div className="modal"><div className="modal-header"><h2 className="modal-title">Thông tin thành viên</h2><button className="btn btn-ghost btn-sm" onClick={() => setSelectedMember(null)}>✕</button></div><div className="modal-body"><h3>{selectedMember.fullName}</h3><p>Đời {selectedMember.generationLevel || 'không rõ'} · {selectedMember.gender === 0 ? 'Nam' : selectedMember.gender === 1 ? 'Nữ' : 'Khác'}</p><p>Sinh: {selectedMember.birthYear || 'không rõ'} · {selectedMember.isAlive ? 'Còn sống' : `Mất: ${selectedMember.deathYear || 'không rõ'}`}</p><p>{selectedMember.biography || 'Chưa có tiểu sử.'}</p><button className="btn btn-primary" onClick={() => { setEditingMember(selectedMember); setSelectedMember(null); }}>Sửa thông tin</button></div></div></div>}
         </div>
     );
 }

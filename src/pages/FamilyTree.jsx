@@ -1,26 +1,17 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import memberService from '../services/memberService';
 import Navbar from '../components/Navbar';
 import { computeTreeLayout, GENDER_COLORS, NODE_WIDTH, NODE_HEIGHT } from '../utils/treeLayout';
 import { API_ORIGIN } from '../services/api';
 import { useFamilyTree } from '../contexts/FamilyTreeContext';
+import membershipService from '../services/membershipService';
+import relationshipService from '../services/relationshipService';
 
 /* ─── Icons ────────────────────────────────────────────────── */
 const IconPlus = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-  </svg>
-);
-const IconBack = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="15 18 9 12 15 6" />
-  </svg>
-);
-const IconRefresh = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
-    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
   </svg>
 );
 const IconSearch = () => (
@@ -31,6 +22,12 @@ const IconSearch = () => (
 const IconMinus = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
     <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+const IconList = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+    <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
   </svg>
 );
 
@@ -93,6 +90,23 @@ export function MemberFormModal({ open, onClose, onSave, members, editingMember 
   }, [open, editingMember]);
 
   const update = (field, value) => setForm(f => ({ ...f, [field]: value }));
+
+  useEffect(() => {
+    if (!open || editingMember) return;
+    const parentIds = [form.fatherId, form.motherId].filter(Boolean);
+    const parents = members.filter(member => parentIds.includes(String(member.id)));
+    const spouse = members.find(member => String(member.id) === String(form.spouseId));
+    const parentGeneration = parents.length > 0
+      ? Math.max(...parents.map(member => Number(member.generation ?? member.generationLevel ?? 1))) + 1
+      : null;
+    const relatedGeneration = spouse
+      ? Number(spouse.generation ?? spouse.generationLevel ?? 1)
+      : null;
+    const inferredGeneration = parentGeneration ?? relatedGeneration;
+    if (inferredGeneration && inferredGeneration !== Number(form.generationLevel)) {
+      setForm(current => ({ ...current, generationLevel: inferredGeneration }));
+    }
+  }, [open, editingMember, form.fatherId, form.motherId, form.spouseId, members]);
 
   const handleSave = async () => {
     const birthYear = form.birthYear === '' ? null : Number(form.birthYear);
@@ -288,7 +302,7 @@ export function MemberFormModal({ open, onClose, onSave, members, editingMember 
                 <label style={labelStyle}>Cha</label>
                 <select style={inputStyle} value={form.fatherId} onChange={e => update('fatherId', e.target.value)}>
                   <option value="">-- Chọn cha --</option>
-                  {members.filter(m => m.gender !== 'female').map(m => (
+                  {members.filter(m => m.gender !== 'female' && m.gender !== 1 && m.gender !== '1').map(m => (
                     <option key={m.id} value={m.id}>{m.full_name}</option>
                   ))}
                 </select>
@@ -297,7 +311,7 @@ export function MemberFormModal({ open, onClose, onSave, members, editingMember 
                 <label style={labelStyle}>Mẹ</label>
                 <select style={inputStyle} value={form.motherId} onChange={e => update('motherId', e.target.value)}>
                   <option value="">-- Chọn mẹ --</option>
-                  {members.filter(m => m.gender === 'female').map(m => (
+                  {members.filter(m => m.gender === 'female' || m.gender === 1 || m.gender === '1').map(m => (
                     <option key={m.id} value={m.id}>{m.full_name}</option>
                   ))}
                 </select>
@@ -420,18 +434,23 @@ export default function FamilyTree() {
   const [error, setError] = useState('');
   const [selectedNode, setSelectedNode] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [relationForm, setRelationForm] = useState({ type: 'parent', targetId: '' });
+  const [relationSaving, setRelationSaving] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [kinship, setKinship] = useState(null);
   const [kinshipFrom, setKinshipFrom] = useState('');
   const [kinshipTo, setKinshipTo] = useState('');
   const [kinshipLoading, setKinshipLoading] = useState(false);
+  const kinshipRequestRef = useRef(0);
   const [toast, setToast] = useState(null);
   const [viewBox, setViewBox] = useState({ x: -400, y: -100, w: 1200, h: 700 });
   const [treeZoom, setTreeZoom] = useState(1);
   const [treePan, setTreePan] = useState({ x: 0, y: 0 });
   const dragRef = useRef(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
+  const [leftPanelOpen, setLeftPanelOpen] = useState(false);
+  const [currentTreeName, setCurrentTreeName] = useState('Gia phả hiện tại');
+  const [exportOpen, setExportOpen] = useState(false);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -450,6 +469,7 @@ export default function FamilyTree() {
       setTreeData(normalizedData);
       const computed = computeTreeLayout(normalizedData.members, normalizedData.relationships);
       setLayout(computed);
+      return computed;
 
       // Auto-fit viewBox
       if (computed.nodes.length > 0) {
@@ -471,6 +491,10 @@ export default function FamilyTree() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    membershipService.getCurrentTree().then(tree => setCurrentTreeName(tree?.name || 'Gia phả hiện tại')).catch(() => { });
+  }, []);
 
   useEffect(() => {
     if (searchParams.get('action') === 'create' && !loading) {
@@ -509,13 +533,43 @@ export default function FamilyTree() {
     }
   };
 
+  const handleRelationSave = async () => {
+    if (!selectedNode || !relationForm.targetId || !hasPermission('relationship.manage')) return;
+    setRelationSaving(true);
+    try {
+      const type = relationForm.type === 'spouse' ? 'spouse' : relationForm.type === 'adopted_child' ? 'adopted_child' : 'parent_child';
+      const personAId = relationForm.type === 'parent' || relationForm.type === 'adopted_child' ? relationForm.targetId : selectedNode.id;
+      const personBId = relationForm.type === 'parent' || relationForm.type === 'adopted_child' ? selectedNode.id : relationForm.targetId;
+      await relationshipService.createRelationship({ type, personAId, personBId, order: 1 });
+      const computed = await loadData();
+      setSelectedNode(computed?.nodes.find(node => node.id === selectedNode.id) || null);
+      setRelationForm({ type: 'parent', targetId: '' });
+    } catch (e) {
+      showToast(e.response?.data?.message || 'Không thể thêm quan hệ.', 'error');
+    } finally { setRelationSaving(false); }
+  };
+
+  const handleRelationDelete = async relation => {
+    if (!hasPermission('relationship.manage') || !relation?.id || !window.confirm('Xóa quan hệ này?')) return;
+    setRelationSaving(true);
+    try {
+      await relationshipService.deleteRelationship(relation.type === 'marriage' ? 'spouse' : 'parent', relation.id);
+      const computed = await loadData();
+      setSelectedNode(computed?.nodes.find(node => node.id === selectedNode.id) || null);
+    } catch (e) { showToast(e.response?.data?.message || 'Không thể xóa quan hệ.', 'error'); }
+    finally { setRelationSaving(false); }
+  };
+
   const handleCheckKinship = async () => {
     if (!kinshipFrom || !kinshipTo) return;
+    const requestId = ++kinshipRequestRef.current;
+    const fromId = kinshipFrom;
+    const toId = kinshipTo;
     setKinshipLoading(true);
     setKinship(null);
     try {
-      const result = await memberService.getKinship(kinshipFrom, kinshipTo);
-      setKinship(result);
+      const result = await memberService.getKinship(fromId, toId);
+      if (requestId === kinshipRequestRef.current) setKinship(result);
     } catch (e) {
       showToast('Không thể tính danh xưng.', 'error');
     } finally {
@@ -523,13 +577,13 @@ export default function FamilyTree() {
     }
   };
 
+  useEffect(() => {
+    if (kinshipFrom && kinshipTo && kinshipFrom !== kinshipTo) handleCheckKinship();
+    else setKinship(null);
+  }, [kinshipFrom, kinshipTo]);
+
   const changeTreeZoom = (amount) => {
     setTreeZoom(value => Math.min(2.5, Math.max(0.55, Number((value + amount).toFixed(2)))));
-  };
-
-  const handleTreeWheel = (event) => {
-    event.preventDefault();
-    changeTreeZoom(event.deltaY < 0 ? 0.1 : -0.1);
   };
 
   const handleTreeMouseDown = (event) => {
@@ -538,19 +592,15 @@ export default function FamilyTree() {
   };
 
   const handleTreeMouseMove = (event) => {
-    if (!dragRef.current) return;
+    const drag = dragRef.current;
+    if (!drag) return;
     const scaleX = viewBox.w / event.currentTarget.clientWidth / treeZoom;
     const scaleY = viewBox.h / event.currentTarget.clientHeight / treeZoom;
     setTreePan(pan => ({
-      x: pan.x - (event.clientX - dragRef.current.clientX) * scaleX,
-      y: pan.y - (event.clientY - dragRef.current.clientY) * scaleY
+      x: pan.x - (event.clientX - drag.clientX) * scaleX,
+      y: pan.y - (event.clientY - drag.clientY) * scaleY
     }));
     dragRef.current = { clientX: event.clientX, clientY: event.clientY };
-  };
-
-  const resetTreeView = () => {
-    setTreeZoom(1);
-    setTreePan({ x: 0, y: 0 });
   };
 
   const exportTreePng = () => {
@@ -578,6 +628,11 @@ export default function FamilyTree() {
     !searchTerm || n.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
   const filteredIds = new Set(filteredNodes.map(n => n.id));
+  const nodeById = new Map(layout.nodes.map(node => [String(node.id), node]));
+  const selectedRelations = treeData.relationships.filter(relation => relation.person_a === selectedNode?.id || relation.person_b === selectedNode?.id);
+  const selectedParents = selectedRelations.filter(relation => relation.type === 'biological_child' || relation.type === 'adopted_child').filter(relation => relation.person_b === selectedNode?.id);
+  const selectedChildren = selectedRelations.filter(relation => relation.type === 'biological_child' || relation.type === 'adopted_child').filter(relation => relation.person_a === selectedNode?.id);
+  const selectedSpouses = selectedRelations.filter(relation => relation.type === 'marriage');
 
   const edgeColor = (type) => type === 'marriage' ? '#f59e0b' : 'var(--color-border)';
 
@@ -590,11 +645,39 @@ export default function FamilyTree() {
       )}
 
       <Navbar />
-      <div className="content-header-row family-tree-titlebar"><div className="section-header"><h1 className="section-title">Cây gia phả</h1><p className="section-sub">Khám phá các thế hệ và mối liên hệ trong dòng họ.</p></div><div className="content-header-actions"><button className="btn btn-secondary btn-sm" onClick={loadData}><IconRefresh /> Làm mới</button><button className="btn btn-primary btn-sm" onClick={() => { setEditingMember(null); setModalOpen(true); }}><IconPlus /> Thêm thành viên</button></div></div>
+      <div className="content-header-row family-tree-titlebar" style={{ alignItems: 'center', marginLeft: 72, marginRight: 16 }}>
+        <div className="content-header-actions">
+          <strong style={{ fontSize: '1.05rem' }}>{currentTreeName}</strong>
+          <button className="btn btn-secondary btn-sm" onClick={() => setLeftPanelOpen(true)} title="Danh sách thành viên"><IconList /> Danh sách</button>
+        </div>
+        <div className="content-header-actions">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} aria-label="Điều chỉnh kích thước cây">
+            <button className="btn btn-secondary btn-sm" title="Thu nhỏ cây" onClick={() => changeTreeZoom(-0.1)}><IconMinus /></button>
+            <button className="btn btn-ghost btn-sm" title="Đặt lại 100%" onClick={() => { setTreeZoom(1); setTreePan({ x: 0, y: 0 }); }} style={{ minWidth: 52 }}>{Math.round(treeZoom * 100)}%</button>
+            <button className="btn btn-secondary btn-sm" title="Phóng to cây" onClick={() => changeTreeZoom(0.1)}><IconPlus /></button>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={() => { setEditingMember(null); setModalOpen(true); }}><IconPlus /> Thêm</button>
+          <div style={{ position: 'relative' }}>
+            <button className="btn btn-secondary btn-sm" disabled={!hasPermission('tree_view.export')} onClick={() => setExportOpen(value => !value)}>Xuất ▾</button>
+            {exportOpen && <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 40, minWidth: 130, padding: 4, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 10px 28px rgba(0,0,0,.2)' }}>
+              <button className="btn btn-ghost btn-sm" style={{ width: '100%', justifyContent: 'flex-start' }} onClick={() => { setExportOpen(false); exportTreePng(); }}>Xuất PNG</button>
+              <button className="btn btn-ghost btn-sm" style={{ width: '100%', justifyContent: 'flex-start' }} onClick={() => { setExportOpen(false); exportTreePdf(); }}>Xuất PDF</button>
+            </div>}
+          </div>
+          <div style={{ display: 'inline-flex', padding: 3, gap: 2, background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 8 }} role="tablist" aria-label="Chuyển chế độ xem">
+            <button className="btn btn-sm" style={{ background: 'var(--color-primary)', color: '#fff', border: 0 }} aria-selected="true">Cây</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/members')}>Danh sách</button>
+          </div>
+        </div>
+      </div>
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', marginLeft: 64 }}>
         {/* Left: Controls */}
-        <div style={{ width: leftPanelOpen ? 280 : 0, opacity: leftPanelOpen ? 1 : 0, background: 'var(--color-surface)', borderRight: leftPanelOpen ? '1px solid var(--color-border)' : 'none', display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'width 220ms ease, opacity 160ms ease' }}>
+        <div style={{ position: 'fixed', zIndex: 20, top: 72, left: 76, bottom: 16, width: 320, opacity: leftPanelOpen ? 1 : 0, pointerEvents: leftPanelOpen ? 'auto' : 'none', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 18px 50px rgba(0,0,0,0.25)', transition: 'opacity 160ms ease, transform 160ms ease', transform: leftPanelOpen ? 'translateY(0)' : 'translateY(-8px)' }}>
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <strong>Thành viên và danh xưng</strong>
+            <button className="btn btn-ghost btn-sm" onClick={() => setLeftPanelOpen(false)} aria-label="Đóng danh sách">✕</button>
+          </div>
           {/* Search */}
           <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--color-border)' }}>
             <div style={{ position: 'relative' }}>
@@ -650,9 +733,6 @@ export default function FamilyTree() {
               <option value="">-- Người B --</option>
               {treeData.members.map(m => <option key={m.id} value={m.id}>{m.full_name}</option>)}
             </select>
-            <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={handleCheckKinship} disabled={!kinshipFrom || !kinshipTo || kinshipLoading}>
-              {kinshipLoading ? 'Đang tính...' : 'Xác định danh xưng'}
-            </button>
             {kinship && (
               <div style={{ marginTop: 10, background: 'var(--color-surface-2)', borderRadius: 8, padding: '10px 12px', fontSize: '0.82rem' }}>
                 <div style={{ fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>{kinship.description}</div>
@@ -668,19 +748,8 @@ export default function FamilyTree() {
           </div>
         </div>
 
-        <button className="btn btn-secondary btn-sm" title={leftPanelOpen ? 'Thu gọn bảng điều khiển' : 'Mở bảng điều khiển'} onClick={() => setLeftPanelOpen(value => !value)} style={{ position: 'absolute', left: leftPanelOpen ? 262 : 8, top: 12, zIndex: 4, transition: 'left 220ms ease' }}>
-          {leftPanelOpen ? '‹' : '›'}
-        </button>
-
         {/* Center: SVG Tree */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 14, right: 14, zIndex: 2, display: 'flex', gap: 4, padding: 4, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
-            <button className="btn btn-secondary btn-sm" disabled={!hasPermission('tree_view.export')} onClick={exportTreePng}>PNG</button>
-            <button className="btn btn-secondary btn-sm" disabled={!hasPermission('tree_view.export')} onClick={exportTreePdf}>PDF</button>
-            <button className="btn btn-secondary btn-sm" title="Thu nhỏ cây" onClick={() => changeTreeZoom(-0.1)}><IconMinus /></button>
-            <button className="btn btn-secondary btn-sm" title="Đặt lại khung nhìn" onClick={resetTreeView}>{Math.round(treeZoom * 100)}%</button>
-            <button className="btn btn-secondary btn-sm" title="Phóng to cây" onClick={() => changeTreeZoom(0.1)}><IconPlus /></button>
-          </div>
+        <div style={{ flex: 1, position: 'relative', overflow: 'auto' }}>
           {loading && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)', flexDirection: 'column', gap: 12 }}>
               <div style={{ fontSize: '2rem' }}>🌳</div>
@@ -701,13 +770,14 @@ export default function FamilyTree() {
             </div>
           )}
 
+          {!loading && error && <div className="alert alert-error" role="alert" style={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 3 }}>{error}</div>}
+
           {!loading && layout.nodes.length > 0 && (
             <svg
               ref={svgRef}
               width="100%" height="100%"
+              style={{ minHeight: Math.max(700, viewBox.h), minWidth: Math.max(900, viewBox.w), background: 'var(--color-bg)', cursor: dragRef.current ? 'grabbing' : 'grab' }}
               viewBox={`${viewBox.x + treePan.x + viewBox.w * (1 - 1 / treeZoom) / 2} ${viewBox.y + treePan.y + viewBox.h * (1 - 1 / treeZoom) / 2} ${viewBox.w / treeZoom} ${viewBox.h / treeZoom}`}
-              style={{ background: 'var(--color-bg)', cursor: dragRef.current ? 'grabbing' : 'grab' }}
-              onWheel={handleTreeWheel}
               onMouseDown={handleTreeMouseDown}
               onMouseMove={handleTreeMouseMove}
               onMouseUp={() => { dragRef.current = null; }}
@@ -726,15 +796,16 @@ export default function FamilyTree() {
                 {layout.edges.map(edge => {
                   const opacity = (!searchTerm || (filteredIds.has(edge.fromId) && filteredIds.has(edge.toId))) ? 1 : 0.1;
                   return (
-                    <path key={edge.id}
-                      d={edge.type === 'marriage'
-                        ? `M ${edge.x1} ${edge.y1} L ${edge.x2} ${edge.y2}`
-                        : `M ${edge.x1} ${edge.y1} L ${edge.x2} ${edge.y2}`
-                      }
+                    edge.type === 'marriage' ? <>
+                      <path key={edge.id} d={`M ${edge.x1} ${edge.y1} L ${edge.x2} ${edge.y2}`} fill="none" stroke={edgeColor(edge.type)} strokeWidth="3" opacity={opacity} />
+                      <text x={(edge.x1 + edge.x2) / 2} y={(edge.y1 + edge.y2) / 2 + 5} textAnchor="middle" fontSize="18" aria-label="Vợ chồng">💍</text>
+                    </> : <path key={edge.id}
+                      d={`M ${edge.x1} ${edge.y1} V ${edge.y1 + (edge.y2 - edge.y1) * 0.42} C ${edge.x1} ${edge.y1 + (edge.y2 - edge.y1) * 0.52} ${edge.x2} ${edge.y1 + (edge.y2 - edge.y1) * 0.48} ${edge.x2} ${edge.y2}`}
                       fill="none"
                       stroke={edgeColor(edge.type)}
-                      strokeWidth={edge.type === 'marriage' ? 2.5 : 1.5}
-                      strokeDasharray={edge.type === 'marriage' ? '6 4' : 'none'}
+                      strokeWidth="2.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                       opacity={opacity}
                     />
                   );
@@ -762,89 +833,111 @@ export default function FamilyTree() {
 
         {/* Right: Detail Panel */}
         {selectedNode && (
-          <div style={{ width: 260, background: 'var(--color-surface)', borderLeft: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'familyPanelIn 220ms ease-out' }}>
-            <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--color-border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Chi tiết</span>
-                <button onClick={() => setSelectedNode(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}>✕</button>
+          <div role="dialog" aria-modal="true" aria-label={`Thông tin ${selectedNode.full_name}`} onClick={event => event.target === event.currentTarget && setSelectedNode(null)} style={{ position: 'fixed', inset: 0, zIndex: 30, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, animation: 'familyPanelIn 220ms ease-out' }}>
+            <div style={{ width: 'min(560px, 100%)', maxHeight: 'min(760px, 92vh)', background: 'var(--color-surface)', borderRadius: 14, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.3)' }}>
+              <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--color-border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Chi tiết</span>
+                  <button onClick={() => setSelectedNode(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}>✕</button>
+                </div>
               </div>
-            </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
-              {/* Avatar */}
-              <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                <div style={{
-                  width: 64, height: 64, borderRadius: 16, margin: '0 auto 8px',
-                  background: (GENDER_COLORS[selectedNode.gender] || GENDER_COLORS.other).bg,
-                  border: `2px solid ${(GENDER_COLORS[selectedNode.gender] || GENDER_COLORS.other).border}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '1.5rem', fontWeight: 700,
-                  color: (GENDER_COLORS[selectedNode.gender] || GENDER_COLORS.other).text
-                }}>
-                  {selectedNode.avatar_url ? (
-                    <img src={selectedNode.avatar_url.startsWith('http') ? selectedNode.avatar_url : `${API_ORIGIN}${selectedNode.avatar_url}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 14 }} />
-                  ) : selectedNode.full_name?.split(' ').slice(-2).map(w => w[0]).join('').toUpperCase()}
+              <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+                {/* Avatar */}
+                <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                  <div style={{
+                    width: 64, height: 64, borderRadius: 16, margin: '0 auto 8px',
+                    background: (GENDER_COLORS[selectedNode.gender] || GENDER_COLORS.other).bg,
+                    border: `2px solid ${(GENDER_COLORS[selectedNode.gender] || GENDER_COLORS.other).border}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '1.5rem', fontWeight: 700,
+                    color: (GENDER_COLORS[selectedNode.gender] || GENDER_COLORS.other).text
+                  }}>
+                    {selectedNode.avatar_url ? (
+                      <img src={selectedNode.avatar_url.startsWith('http') ? selectedNode.avatar_url : `${API_ORIGIN}${selectedNode.avatar_url}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 14 }} />
+                    ) : selectedNode.full_name?.split(' ').slice(-2).map(w => w[0]).join('').toUpperCase()}
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text-primary)' }}>{selectedNode.full_name}</div>
+                  {!selectedNode.isAlive && <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>† Đã mất</div>}
                 </div>
-                <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text-primary)' }}>{selectedNode.full_name}</div>
-                {!selectedNode.isAlive && <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>† Đã mất</div>}
+
+                {[
+                  ['Giới tính', selectedNode.gender === 'male' ? 'Nam' : selectedNode.gender === 'female' ? 'Nữ' : 'Khác'],
+                  ['Đời thứ', `Đời ${selectedNode.generation}`],
+                  ['Năm sinh', selectedNode.birth_year || 'Không rõ'],
+                  ['Năm mất', !selectedNode.isAlive ? (selectedNode.death_year || 'Không rõ') : null],
+                  ['Tên húy', selectedNode.taboo_name || null],
+                  ['Tên tự / tên khác', selectedNode.courtesy_name || null],
+                  ['Tên khác', selectedNode.other_names || null],
+                  ['Thứ tự sinh', selectedNode.birth_order ? `Con thứ ${selectedNode.birth_order}` : null],
+                  ['Ngày sinh', [selectedNode.birth_day, selectedNode.birth_month, selectedNode.birth_year].filter(Boolean).join('/') || null],
+                  ['Ngày sinh âm lịch', selectedNode.birth_date_lunar || null],
+                  ['Ngày mất', !selectedNode.isAlive && [selectedNode.death_day, selectedNode.death_month, selectedNode.death_year].filter(Boolean).join('/') || null],
+                  ['Ngày mất âm lịch', !selectedNode.isAlive ? (selectedNode.death_date_lunar || null) : null],
+                  ['Nghề nghiệp', selectedNode.occupation || null],
+                  ['Nơi ở', selectedNode.current_residence || null],
+                ].filter(([, v]) => v != null).map(([label, value]) => (
+                  <div key={label} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 0.8fr) 1.2fr', gap: 12, alignItems: 'baseline', padding: '9px 0', borderBottom: '1px solid var(--color-border)' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--color-text-primary)', fontWeight: 600 }}>{value}</div>
+                  </div>
+                ))}
+
+                {selectedNode.biography && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Tiểu sử</div>
+                    <div style={{ fontSize: '0.825rem', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>{selectedNode.biography}</div>
+                  </div>
+                )}
+
+                <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--color-border)' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Cha mẹ</div>
+                  {selectedParents.length === 0 && <div style={{ fontSize: '.82rem', color: 'var(--color-text-muted)' }}>Chưa cập nhật</div>}
+                  {selectedParents.map(relation => <div key={relation.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}><button onClick={() => setSelectedNode(nodeById.get(relation.person_a) || null)} style={{ border: 0, background: 'none', padding: 0, color: 'var(--color-primary)', cursor: 'pointer' }}>{nodeById.get(relation.person_a)?.full_name || 'Không rõ'}</button>{hasPermission('relationship.manage') && <button className="btn btn-ghost btn-sm" disabled={relationSaving} onClick={() => handleRelationDelete(relation)}>Xóa</button>}</div>)}
+                </div>
+
+                {selectedSpouses.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Vợ/Chồng</div>
+                    {selectedSpouses.map(relation => {
+                      const spouseId = relation.person_a === selectedNode.id ? relation.person_b : relation.person_a;
+                      return <div key={relation.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' }}><button onClick={() => setSelectedNode(nodeById.get(spouseId) || null)} style={{ border: 0, background: 'none', padding: 0, color: 'var(--color-primary)', cursor: 'pointer' }}>{nodeById.get(spouseId)?.full_name || 'Không rõ'}</button>{hasPermission('relationship.manage') && <button className="btn btn-ghost btn-sm" disabled={relationSaving} onClick={() => handleRelationDelete(relation)}>Xóa</button>}</div>;
+                    })}
+                  </div>
+                )}
+
+                {selectedNode.children?.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Con cái ({selectedNode.children.length})</div>
+                    {selectedChildren.map(relation => (
+                      <div key={relation.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><button onClick={() => setSelectedNode(nodeById.get(relation.person_b) || null)} style={{ display: 'block', textAlign: 'left', background: 'none', border: 0, fontSize: '0.825rem', color: 'var(--color-primary)', padding: '3px 0', cursor: 'pointer' }}>{nodeById.get(relation.person_b)?.full_name || 'Không rõ'}</button>{hasPermission('relationship.manage') && <button className="btn btn-ghost btn-sm" disabled={relationSaving} onClick={() => handleRelationDelete(relation)}>Xóa</button>}</div>
+                    ))}
+                  </div>
+                )}
+
+                {hasPermission('relationship.manage') && <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-border)' }}>
+                  <div style={{ fontSize: '.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Thêm quan hệ</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr auto', gap: 6 }}>
+                    <select className="input" value={relationForm.type} onChange={event => setRelationForm({ type: event.target.value, targetId: '' })}>
+                      <option value="parent">Cha/mẹ</option><option value="adopted_child">Con nuôi</option><option value="child">Con</option><option value="spouse">Vợ/chồng</option>
+                    </select>
+                    <select className="input" value={relationForm.targetId} onChange={event => setRelationForm({ ...relationForm, targetId: event.target.value })}>
+                      <option value="">Chọn thành viên</option>{layout.nodes.filter(node => node.id !== selectedNode.id).map(node => <option key={node.id} value={node.id}>{node.full_name}</option>)}
+                    </select>
+                    <button className="btn btn-primary btn-sm" disabled={!relationForm.targetId || relationSaving} onClick={handleRelationSave}>Lưu</button>
+                  </div>
+                </div>}
               </div>
 
-              {[
-                ['Giới tính', selectedNode.gender === 'male' ? 'Nam' : selectedNode.gender === 'female' ? 'Nữ' : 'Khác'],
-                ['Đời thứ', `Đời ${selectedNode.generation}`],
-                ['Năm sinh', selectedNode.birth_year || 'Không rõ'],
-                ['Năm mất', !selectedNode.isAlive ? (selectedNode.death_year || 'Không rõ') : null],
-                ['Tên húy', selectedNode.taboo_name || null],
-                ['Tên tự / tên khác', selectedNode.courtesy_name || null],
-                ['Tên khác', selectedNode.other_names || null],
-                ['Thứ tự sinh', selectedNode.birth_order ? `Con thứ ${selectedNode.birth_order}` : null],
-                ['Ngày sinh', [selectedNode.birth_day, selectedNode.birth_month, selectedNode.birth_year].filter(Boolean).join('/') || null],
-                ['Ngày sinh âm lịch', selectedNode.birth_date_lunar || null],
-                ['Ngày mất', !selectedNode.isAlive && [selectedNode.death_day, selectedNode.death_month, selectedNode.death_year].filter(Boolean).join('/') || null],
-                ['Ngày mất âm lịch', !selectedNode.isAlive ? (selectedNode.death_date_lunar || null) : null],
-                ['Nghề nghiệp', selectedNode.occupation || null],
-                ['Nơi ở', selectedNode.current_residence || null],
-              ].filter(([, v]) => v != null).map(([label, value]) => (
-                <div key={label} style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--color-text-primary)', fontWeight: 500 }}>{value}</div>
-                </div>
-              ))}
-
-              {selectedNode.biography && (
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Tiểu sử</div>
-                  <div style={{ fontSize: '0.825rem', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>{selectedNode.biography}</div>
-                </div>
-              )}
-
-              {selectedNode.spouses?.length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Vợ/Chồng</div>
-                  {selectedNode.spouses.map(s => (
-                    <div key={s.id} style={{ fontSize: '0.825rem', color: 'var(--color-text-primary)', padding: '3px 0' }}>{s.full_name}</div>
-                  ))}
-                </div>
-              )}
-
-              {selectedNode.children?.length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Con cái ({selectedNode.children.length})</div>
-                  {selectedNode.children.map(c => (
-                    <div key={c.id} style={{ fontSize: '0.825rem', color: 'var(--color-text-primary)', padding: '3px 0' }}>{c.full_name}</div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div style={{ padding: '12px 14px', borderTop: '1px solid var(--color-border)', display: 'flex', gap: 8 }}>
-              <button className="btn btn-secondary btn-sm" style={{ flex: 1 }}
-                onClick={() => { setEditingMember(selectedNode); setModalOpen(true); }}>
-                Sửa
-              </button>
-              <button className="btn btn-sm" style={{ flex: 1, background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}
-                onClick={() => handleDelete(selectedNode.id)}>
-                Xóa
-              </button>
+              <div style={{ padding: '12px 14px', borderTop: '1px solid var(--color-border)', display: 'flex', gap: 8 }}>
+                <button className="btn btn-secondary btn-sm" style={{ flex: 1 }}
+                  onClick={() => { setEditingMember(selectedNode); setModalOpen(true); }}>
+                  Sửa
+                </button>
+                <button className="btn btn-sm" style={{ flex: 1, background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}
+                  onClick={() => handleDelete(selectedNode.id)}>
+                  Xóa
+                </button>
+              </div>
             </div>
           </div>
         )}

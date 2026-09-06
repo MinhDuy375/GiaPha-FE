@@ -112,6 +112,34 @@ export function computeTreeLayout(members, relationships) {
       positionMap.set(item.member.id, { x, y: positionMap.get(item.member.id)?.y ?? 0 });
       previousRight = x;
     }
+
+    // Keep each generation centered after collision spacing, producing a stable pyramid.
+    const placedMembers = genMembers.map(member => positionMap.get(member.id)).filter(Boolean);
+    if (placedMembers.length > 0) {
+      const left = Math.min(...placedMembers.map(position => position.x));
+      const right = Math.max(...placedMembers.map(position => position.x + NODE_WIDTH));
+      const offset = -(left + right) / 2;
+      for (const member of genMembers) {
+        const position = positionMap.get(member.id);
+        if (position) position.x += offset;
+      }
+    }
+  }
+
+  // Keep spouses side by side so their shared descendant branch has one visual origin.
+  const paired = new Set();
+  for (const [personId, spouseIds] of spousesByPersonId) {
+    for (const spouseId of spouseIds) {
+      const pairKey = [personId, spouseId].sort().join('-');
+      if (paired.has(pairKey)) continue;
+      paired.add(pairKey);
+      const first = positionMap.get(personId);
+      const second = positionMap.get(spouseId);
+      if (!first || !second || first.y !== second.y) continue;
+      const left = Math.min(first.x, second.x);
+      first.x = left;
+      second.x = left + NODE_WIDTH + H_SPACING;
+    }
   }
 
   // Xây dựng danh sách nodes
@@ -149,13 +177,21 @@ export function computeTreeLayout(members, relationships) {
     const posB = positionMap.get(rel.person_b);
     if (!posA || !posB) continue;
 
+    let parentX = posA.x + NODE_WIDTH / 2;
+    let parentY = posA.y + NODE_HEIGHT;
+    if (rel.type !== 'marriage') {
+      const spouseId = (spousesByPersonId.get(rel.person_a) || []).find(id => positionMap.get(id)?.y === posA.y);
+      const spousePosition = spouseId ? positionMap.get(spouseId) : null;
+      if (spousePosition) parentX = (parentX + spousePosition.x + NODE_WIDTH / 2) / 2;
+    }
+
     edges.push({
       id: key,
       type: rel.type,
       fromId: rel.person_a,
       toId: rel.person_b,
-      x1: posA.x + NODE_WIDTH / 2,
-      y1: rel.type === 'marriage' ? posA.y + NODE_HEIGHT / 2 : posA.y + NODE_HEIGHT,
+      x1: rel.type === 'marriage' ? posA.x + NODE_WIDTH / 2 : parentX,
+      y1: rel.type === 'marriage' ? posA.y + NODE_HEIGHT / 2 : parentY,
       x2: posB.x + NODE_WIDTH / 2,
       y2: rel.type === 'marriage' ? posB.y + NODE_HEIGHT / 2 : posB.y,
       order: rel.order,
