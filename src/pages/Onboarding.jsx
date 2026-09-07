@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import familyTreeService from "../services/familyTreeService";
+import api from "../services/api";
 
 const IconTree = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -11,6 +11,12 @@ const IconTree = () => (
 const IconKey = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
+  </svg>
+);
+const IconUsers = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
 );
 const IconAlert = () => (
@@ -25,21 +31,8 @@ export default function Onboarding() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
-  const [joinRequests, setJoinRequests] = useState([]);
   const { user } = useAuth();
   const navigate = useNavigate();
-
-  const loadJoinRequests = async () => {
-    try {
-      setJoinRequests(await familyTreeService.getMyJoinRequests());
-    } catch {
-      setJoinRequests([]);
-    }
-  };
-
-  useEffect(() => {
-    Promise.resolve().then(loadJoinRequests);
-  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -48,15 +41,14 @@ export default function Onboarding() {
     try {
       if (mode === "create") {
         // Tạo dòng họ mới
-        await familyTreeService.createTree(value.trim(), '');
+        await api.post('/familytree', { name: value });
         navigate("/select-tree");
       } else {
         // Tham gia bằng mã
-        const result = await familyTreeService.joinTree(value);
-        if (result.status === 'Pending') {
-          setSuccess(result.message);
+        const result = await api.post('/familytree/join', { joinCode: value.trim().toUpperCase() });
+        if (result.data.status === 'Pending') {
+          setSuccess(result.data.message);
           setValue("");
-          await loadJoinRequests();
         } else {
           navigate("/select-tree");
         }
@@ -168,14 +160,6 @@ export default function Onboarding() {
               </>
             )}
           </div>
-
-          {joinRequests.map(request => (
-            <div key={`${request.familyTreeId}-${request.statusText}`} className={`alert ${request.statusText === 'Rejected' ? 'alert-error' : 'alert-success'}`} role="status" style={{ marginBottom: 16 }}>
-              {request.statusText === 'Rejected'
-                ? `Yêu cầu tham gia gia phả "${request.familyTreeName}" đã bị từ chối. Bạn có thể gửi lại yêu cầu bằng mã gia phả.`
-                : `Yêu cầu tham gia gia phả "${request.familyTreeName}" đang chờ quản trị viên duyệt.`}
-            </div>
-          ))}
 
           {error && (
             <div className="alert alert-error" role="alert" style={{ marginBottom: "20px" }}>
