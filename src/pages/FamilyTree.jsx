@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import memberService from '../services/memberService';
 import Navbar from '../components/Navbar';
-import { computeTreeLayout, GENDER_COLORS, NODE_WIDTH, NODE_HEIGHT } from '../utils/treeLayout';
+import { computeTreeLayout, filterTreeData, GENDER_COLORS, NODE_WIDTH, NODE_HEIGHT, AVATAR_RADIUS, RING_GAP } from '../utils/treeLayout';
 import { API_ORIGIN } from '../services/api';
 import { useFamilyTree } from '../contexts/FamilyTreeContext';
 import membershipService from '../services/membershipService';
 import relationshipService from '../services/relationshipService';
 
-/* ─── Icons ────────────────────────────────────────────────── */
 const IconPlus = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -28,6 +28,11 @@ const IconList = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
     <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+  </svg>
+);
+const IconFilter = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
   </svg>
 );
 
@@ -367,55 +372,155 @@ export function MemberFormModal({ open, onClose, onSave, members, editingMember 
 }
 
 /* ─── Tree Node Card ────────────────────────────────────────── */
-function NodeCard({ member, isSelected, onClick }) {
-  const colors = GENDER_COLORS[member.gender] || GENDER_COLORS.other;
-  const initials = member.full_name?.split(' ').slice(-2).map(w => w[0]).join('').toUpperCase() || '?';
-  const years = [member.birth_year, member.death_year].filter(Boolean);
+
+/** Vẽ nội dung 1 người (avatar/tên/năm) bên trong 1 nửa thẻ có gốc tại (x, y) và bề rộng `width`. */
+function PersonHalf({ person, x, y, width, height, colors, minimal }) {
+  const cx = x + width / 2;
+  const cardH = height || NODE_HEIGHT;
+  const initials = person.full_name?.split(' ').slice(-2).map(w => w[0]).join('').toUpperCase() || '?';
+  const years = [person.birth_year, person.death_year].filter(Boolean);
   const yearStr = years.length === 2 ? `${years[0]} – ${years[1]}` : years[0] ? `SN ${years[0]}` : '';
 
-  return (
-    <g onClick={() => onClick(member)} style={{ cursor: 'pointer' }}>
-      <rect
-        x={member.x} y={member.y}
-        width={NODE_WIDTH} height={NODE_HEIGHT}
-        rx={12}
-        fill="var(--color-surface)"
-        stroke={isSelected ? colors.border : (member.isAlive ? colors.border : 'var(--color-border)')}
-        strokeWidth={isSelected ? 2.5 : 1.5}
-        style={{ transition: 'all 0.2s', filter: isSelected ? `drop-shadow(0 0 8px ${colors.border}80)` : 'drop-shadow(0 2px 4px rgba(0,0,0,0.12))' }}
-        opacity={member.isAlive ? 1 : 0.7}
-      />
-      <defs><clipPath id={`avatar-${member.id}`}><circle cx={member.x + NODE_WIDTH / 2} cy={member.y + 38} r={25} /></clipPath></defs>
-      {/* Avatar centered above the member name */}
-      <circle cx={member.x + NODE_WIDTH / 2} cy={member.y + 38} r={25}
-        fill={colors.bg} stroke={colors.border} strokeWidth={2} />
-      {member.avatar_url ? <image href={member.avatar_url.startsWith('http') ? member.avatar_url : `${API_ORIGIN}${member.avatar_url}`} x={member.x + NODE_WIDTH / 2 - 25} y={member.y + 13} width={50} height={50} preserveAspectRatio="xMidYMid slice" clipPath={`url(#avatar-${member.id})`} /> : <text x={member.x + NODE_WIDTH / 2} y={member.y + 44}
-        textAnchor="middle" fontSize={13} fontWeight={700} fill={colors.text}>
-        {initials}
-      </text>}
+  if (minimal) {
+    return (
+      <>
+        <foreignObject x={x + 4} y={y} width={Math.max(width - 8, 0)} height={cardH}>
+          <div xmlns="http://www.w3.org/1999/xhtml" style={{
+            height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)', textAlign: 'center', lineHeight: 1.25,
+            overflow: 'hidden', whiteSpace: 'normal', wordBreak: 'break-word'
+          }}>
+            {person.full_name}
+          </div>
+        </foreignObject>
+        {!person.isAlive && <text x={x + width - 12} y={y + 15} fontSize={11} fill="var(--color-text-muted)">†</text>}
+      </>
+    );
+  }
 
-      {/* Name */}
-      <foreignObject x={member.x + 8} y={member.y + 72} width={NODE_WIDTH - 16} height={38}>
+  return (
+    <>
+      <defs><clipPath id={`avatar-${person.id}`}><circle cx={cx} cy={y + 46} r={AVATAR_RADIUS} /></clipPath></defs>
+      <circle cx={cx} cy={y + 46} r={AVATAR_RADIUS} fill={colors.bg} stroke={colors.border} strokeWidth={2.5} />
+      {person.avatar_url ? (
+        <image
+          href={person.avatar_url.startsWith('http') ? person.avatar_url : `${API_ORIGIN}${person.avatar_url}`}
+          x={cx - AVATAR_RADIUS} y={y + 46 - AVATAR_RADIUS} width={AVATAR_RADIUS * 2} height={AVATAR_RADIUS * 2}
+          preserveAspectRatio="xMidYMid slice" clipPath={`url(#avatar-${person.id})`} />
+      ) : (
+        <text x={cx} y={y + 52} textAnchor="middle" fontSize={16} fontWeight={700} fill={colors.text}>{initials}</text>
+      )}
+      <foreignObject x={x + 6} y={y + 46 + AVATAR_RADIUS + 6} width={Math.max(width - 12, 0)} height={38}>
         <div xmlns="http://www.w3.org/1999/xhtml" style={{
           fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)', textAlign: 'center',
           lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box',
           WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'
         }}>
-          {member.full_name}
+          {person.full_name}
         </div>
       </foreignObject>
-
-      {/* Year */}
       {yearStr && (
-        <text x={member.x + NODE_WIDTH / 2} y={member.y + NODE_HEIGHT - 10}
-          textAnchor="middle" fontSize={11} fill="var(--color-text-muted)">
+        <text x={cx} y={y + cardH - 10} textAnchor="middle" fontSize={11} fill="var(--color-text-muted)">
           {yearStr}
         </text>
       )}
+      {!person.isAlive && <text x={x + width - 14} y={y + 18} fontSize={14} fill="var(--color-text-muted)">†</text>}
+    </>
+  );
+}
 
-      {/* Deceased indicator */}
-      {!member.isAlive && (
-        <text x={member.x + NODE_WIDTH - 12} y={member.y + 16} fontSize={14} fill="var(--color-text-muted)">†</text>
+/**
+ * Thẻ thành viên trên cây. Nếu là "trưởng cặp" (isCoupleLead) của vợ/chồng chính,
+ * gộp cả 2 người vào chung 1 thẻ, ngăn cách bằng biểu tượng nhẫn 💍.
+ * Người bị gộp vào thẻ đối phương (mergedIntoPartner) không tự vẽ thẻ riêng.
+ */
+function NodeCard({ member, selectedId, onSelectId, minimal }) {
+  if (member.mergedIntoPartner) return null;
+
+  const colors = GENDER_COLORS[member.gender] || GENDER_COLORS.other;
+  const isCouple = member.isCoupleLead && !!member.partnerData;
+  const cardHeight = member.height || NODE_HEIGHT;
+  const leftWidth = member.width || NODE_WIDTH;
+  const coupleGap = 14; // khoảng hở nhỏ giữa 2 thẻ vợ chồng riêng biệt (chỗ đặt icon nhẫn)
+  const rightWidth = isCouple ? (member.coupleWidth - leftWidth - RING_GAP + coupleGap) : 0;
+  const width = isCouple ? member.coupleWidth : leftWidth;
+  const partnerColors = isCouple ? (GENDER_COLORS[member.partnerData.gender] || GENDER_COLORS.other) : null;
+  const isSelected = selectedId === member.id || (isCouple && selectedId === member.partnerData.id);
+  const centerX = member.x + leftWidth;
+
+  return (
+    <g className="gp-card">
+      {/* Thẻ đơn: cả thẻ nổi lên khi hover. Thẻ vợ chồng: mỗi nửa hover riêng, không dùng transform chung cho cả <g>. */}
+      {!isCouple ? (
+        <g className="gp-card-half">
+          <rect
+            className="gp-card-rect"
+            x={member.x} y={member.y}
+            width={width} height={cardHeight}
+            rx={14}
+            fill="var(--color-surface)"
+            stroke={isSelected ? colors.border : (member.isAlive ? colors.border : 'var(--color-border)')}
+            strokeWidth={isSelected ? 2.5 : 1.5}
+            style={isSelected ? { filter: `drop-shadow(0 0 10px ${colors.border}90)` } : undefined}
+            opacity={member.isAlive ? 1 : 0.75}
+          />
+          <g onClick={e => { e.stopPropagation(); onSelectId(member.id); }} style={{ cursor: 'pointer' }}>
+            <PersonHalf person={member} x={member.x} y={member.y} width={width} height={cardHeight} colors={colors} minimal={minimal} />
+          </g>
+        </g>
+      ) : (
+        <>
+          {/* Nền chung phía sau — bao trọn 2 thẻ vợ chồng, tạo cảm giác liên kết "cùng 1 gia đình". */}
+          <rect
+            x={member.x - 6} y={member.y - 6}
+            width={width + 12} height={cardHeight + 12}
+            rx={18}
+            fill="var(--color-surface)"
+            stroke="var(--color-border)"
+            strokeWidth={1}
+            opacity={0.6}
+          />
+
+          {/* Thẻ vợ (trái) — bo đủ 4 góc, viền màu riêng theo giới tính, kích thước bằng thẻ chồng. */}
+          <g className="gp-card-half">
+            <rect
+              className="gp-card-rect gp-card-rect--half"
+              x={member.x} y={member.y}
+              width={leftWidth} height={cardHeight}
+              rx={14}
+              fill="var(--color-surface)"
+              stroke={colors.border}
+              strokeWidth={selectedId === member.id ? 2.5 : 1.5}
+              style={selectedId === member.id ? { filter: `drop-shadow(0 0 8px ${colors.border}90)` } : undefined}
+              opacity={member.isAlive ? 1 : 0.75}
+            />
+            <g onClick={e => { e.stopPropagation(); onSelectId(member.id); }} style={{ cursor: 'pointer' }}>
+              <PersonHalf person={member} x={member.x} y={member.y} width={leftWidth} height={cardHeight} colors={colors} minimal={minimal} />
+            </g>
+          </g>
+
+          {/* Thẻ chồng (phải) — bo đủ 4 góc, viền màu riêng theo giới tính, kích thước bằng thẻ vợ. */}
+          <g className="gp-card-half">
+            <rect
+              className="gp-card-rect gp-card-rect--half"
+              x={centerX + coupleGap} y={member.y}
+              width={rightWidth} height={cardHeight}
+              rx={14}
+              fill="var(--color-surface)"
+              stroke={partnerColors.border}
+              strokeWidth={selectedId === member.partnerData.id ? 2.5 : 1.5}
+              style={selectedId === member.partnerData.id ? { filter: `drop-shadow(0 0 8px ${partnerColors.border}90)` } : undefined}
+              opacity={member.partnerData.isAlive ? 1 : 0.75}
+            />
+            <g onClick={e => { e.stopPropagation(); onSelectId(member.partnerData.id); }} style={{ cursor: 'pointer' }}>
+              <PersonHalf person={member.partnerData} x={centerX + coupleGap} y={member.y} width={rightWidth} height={cardHeight} colors={partnerColors} minimal={minimal} />
+            </g>
+          </g>
+
+          {/* Icon nhẫn — render sau cùng để luôn nổi lên trên cả 2 thẻ, đè lên khoảng hở giữa 2 thẻ. */}
+          <circle cx={centerX + coupleGap / 2} cy={member.y + cardHeight / 2} r={13} fill="var(--color-surface)" stroke="#f59e0b" strokeWidth={1.5} />
+          <text x={centerX + coupleGap / 2} y={member.y + cardHeight / 2 + 5} textAnchor="middle" fontSize={14} aria-label="Vợ chồng">💍</text>
+        </>
       )}
     </g>
   );
@@ -452,6 +557,23 @@ export default function FamilyTree() {
   const [currentTreeName, setCurrentTreeName] = useState('Gia phả hiện tại');
   const [exportOpen, setExportOpen] = useState(false);
 
+  // ─── Bộ lọc hiển thị cây ───────────────────────────────────
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    minimalView: false,     // chỉ hiện tên, ẩn avatar/năm sinh mất
+    maxGeneration: null,    // null = hiện tất cả các đời; số = chỉ hiện đời 1..N
+    hideInLaw: false,       // ẩn thành viên dâu/rể
+    hideMale: false,        // ẩn nam
+    hideFemale: false,      // ẩn nữ
+  });
+  const filtersRef = useRef(filters);
+  useEffect(() => { filtersRef.current = filters; }, [filters]);
+
+  const buildLayout = useCallback((data, activeFilters) => {
+    const filtered = filterTreeData(data.members, data.relationships, activeFilters);
+    return computeTreeLayout(filtered.members, filtered.relationships, { minimal: activeFilters.minimalView });
+  }, []);
+
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
@@ -467,30 +589,36 @@ export default function FamilyTree() {
         relationships: Array.isArray(data?.relationships) ? data.relationships.filter(Boolean) : []
       };
       setTreeData(normalizedData);
-      const computed = computeTreeLayout(normalizedData.members, normalizedData.relationships);
+      const computed = buildLayout(normalizedData, filtersRef.current);
       setLayout(computed);
       return computed;
-
-      // Auto-fit viewBox
-      if (computed.nodes.length > 0) {
-        const xs = computed.nodes.map(n => n.x);
-        const ys = computed.nodes.map(n => n.y);
-        const minX = Math.min(...xs) - 80;
-        const minY = Math.min(...ys) - 80;
-        const maxX = Math.max(...xs) + NODE_WIDTH + 80;
-        const maxY = Math.max(...ys) + NODE_HEIGHT + 80;
-        setViewBox({ x: minX, y: minY, w: maxX - minX, h: maxY - minY });
-        setTreeZoom(1);
-        setTreePan({ x: 0, y: 0 });
-      }
     } catch (e) {
       setError('Không thể tải dữ liệu cây gia phả. ' + (e.response?.data?.message || ''));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [buildLayout]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Khi đổi bộ lọc, bố cục lại cây từ dữ liệu đã có sẵn (không cần gọi lại API).
+  useEffect(() => {
+    setLayout(buildLayout(treeData, filters));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
+
+  // Tự căn khung nhìn (viewBox) mỗi khi bố cục cây thay đổi (tải mới hoặc đổi bộ lọc).
+  useEffect(() => {
+    if (layout.nodes.length === 0) return;
+    const rights = layout.nodes.map(n => n.x + (n.isCoupleLead ? n.coupleWidth : (n.width || NODE_WIDTH)));
+    const minX = Math.min(...layout.nodes.map(n => n.x)) - 80;
+    const minY = Math.min(...layout.nodes.map(n => n.y)) - 80;
+    const maxX = Math.max(...rights) + 80;
+    const maxY = Math.max(...layout.nodes.map(n => n.y + (n.height || NODE_HEIGHT))) + 80;
+    setViewBox({ x: minX, y: minY, w: maxX - minX, h: maxY - minY });
+    setTreeZoom(1);
+    setTreePan({ x: 0, y: 0 });
+  }, [layout.nodes]);
 
   useEffect(() => {
     membershipService.getCurrentTree().then(tree => setCurrentTreeName(tree?.name || 'Gia phả hiện tại')).catch(() => { });
@@ -629,12 +757,19 @@ export default function FamilyTree() {
   );
   const filteredIds = new Set(filteredNodes.map(n => n.id));
   const nodeById = new Map(layout.nodes.map(node => [String(node.id), node]));
+  const selectNodeById = (id) => setSelectedNode(nodeById.get(String(id)) || nodeById.get(id) || null);
+
   const selectedRelations = treeData.relationships.filter(relation => relation.person_a === selectedNode?.id || relation.person_b === selectedNode?.id);
   const selectedParents = selectedRelations.filter(relation => relation.type === 'biological_child' || relation.type === 'adopted_child').filter(relation => relation.person_b === selectedNode?.id);
   const selectedChildren = selectedRelations.filter(relation => relation.type === 'biological_child' || relation.type === 'adopted_child').filter(relation => relation.person_a === selectedNode?.id);
   const selectedSpouses = selectedRelations.filter(relation => relation.type === 'marriage');
 
   const edgeColor = (type) => type === 'marriage' ? '#f59e0b' : 'var(--color-border)';
+
+  const maxGenAvailable = Math.max(1, ...treeData.members.map(m => Number(m.generation ?? 1)), 1);
+  const activeFilterCount = (filters.minimalView ? 1 : 0) + (filters.hideInLaw ? 1 : 0) + (filters.hideMale ? 1 : 0)
+    + (filters.hideFemale ? 1 : 0) + (filters.maxGeneration != null && filters.maxGeneration < maxGenAvailable ? 1 : 0);
+  const resetFilters = () => setFilters({ minimalView: false, maxGeneration: null, hideInLaw: false, hideMale: false, hideFemale: false });
 
   return (
     <div className="page" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -657,6 +792,87 @@ export default function FamilyTree() {
             <button className="btn btn-secondary btn-sm" title="Phóng to cây" onClick={() => changeTreeZoom(0.1)}><IconPlus /></button>
           </div>
           <button className="btn btn-primary btn-sm" onClick={() => { setEditingMember(null); setModalOpen(true); }}><IconPlus /> Thêm</button>
+
+          {/* Bộ lọc hiển thị */}
+          <div style={{ position: 'relative' }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => setFilterOpen(v => !v)}>
+              <IconFilter /> Bộ lọc{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+            </button>
+            {filterOpen && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 40, width: 288, padding: 14, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 10px 28px rgba(0,0,0,.2)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', marginBottom: 14, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={filters.minimalView} onChange={e => setFilters(f => ({ ...f, minimalView: e.target.checked }))} />
+                  Hiển thị dạng tối giản (chỉ hiện tên)
+                </label>
+
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
+                    Số thế hệ hiển thị: Đời 1 – {filters.maxGeneration ?? maxGenAvailable}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ padding: '4px 8px' }}
+                      disabled={(filters.maxGeneration ?? maxGenAvailable) <= 1}
+                      onClick={() => setFilters(f => {
+                        const current = f.maxGeneration ?? maxGenAvailable;
+                        const next = Math.max(1, current - 1);
+                        return { ...f, maxGeneration: next };
+                      })}
+                    >
+                      <IconMinus />
+                    </button>
+                    <input
+                      type="number" min={1} max={maxGenAvailable} step={1}
+                      value={filters.maxGeneration ?? maxGenAvailable}
+                      onChange={e => {
+                        const raw = e.target.value;
+                        if (raw === '') return;
+                        const value = Math.min(maxGenAvailable, Math.max(1, Number(raw)));
+                        setFilters(f => ({ ...f, maxGeneration: value >= maxGenAvailable ? null : value }));
+                      }}
+                      className="input"
+                      style={{ width: 56, textAlign: 'center', padding: '4px 6px' }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ padding: '4px 8px' }}
+                      disabled={(filters.maxGeneration ?? maxGenAvailable) >= maxGenAvailable}
+                      onClick={() => setFilters(f => {
+                        const current = f.maxGeneration ?? maxGenAvailable;
+                        const next = Math.min(maxGenAvailable, current + 1);
+                        return { ...f, maxGeneration: next >= maxGenAvailable ? null : next };
+                      })}
+                    >
+                      <IconPlus />
+                    </button>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>/ {maxGenAvailable}</span>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 8 }}>Lọc dữ liệu</div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', marginBottom: 6, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={filters.hideInLaw} onChange={e => setFilters(f => ({ ...f, hideInLaw: e.target.checked }))} />
+                  Ẩn thành viên dâu/rể
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', marginBottom: 6, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={filters.hideMale} onChange={e => setFilters(f => ({ ...f, hideMale: e.target.checked }))} />
+                  Ẩn nam
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', marginBottom: 12, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={filters.hideFemale} onChange={e => setFilters(f => ({ ...f, hideFemale: e.target.checked }))} />
+                  Ẩn nữ
+                </label>
+
+                <button className="btn btn-ghost btn-sm" style={{ width: '100%' }} onClick={resetFilters} disabled={activeFilterCount === 0}>
+                  Đặt lại bộ lọc
+                </button>
+              </div>
+            )}
+          </div>
+
           <div style={{ position: 'relative' }}>
             <button className="btn btn-secondary btn-sm" disabled={!hasPermission('tree_view.export')} onClick={() => setExportOpen(value => !value)}>Xuất ▾</button>
             {exportOpen && <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 40, minWidth: 130, padding: 4, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 10px 28px rgba(0,0,0,.2)' }}>
@@ -761,11 +977,19 @@ export default function FamilyTree() {
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
               <div style={{ fontSize: '4rem' }}>🌿</div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>Chưa có thành viên nào</div>
-                <div style={{ color: 'var(--color-text-muted)', marginBottom: 16 }}>Hãy thêm thành viên đầu tiên để xây dựng cây gia phả.</div>
-                <button className="btn btn-primary" onClick={() => { setEditingMember(null); setModalOpen(true); }}>
-                  <IconPlus /> Thêm thành viên đầu tiên
-                </button>
+                <div style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>
+                  {treeData.members.length > 0 ? 'Không có thành viên nào khớp bộ lọc' : 'Chưa có thành viên nào'}
+                </div>
+                <div style={{ color: 'var(--color-text-muted)', marginBottom: 16 }}>
+                  {treeData.members.length > 0 ? 'Hãy thử nới bớt bộ lọc đang áp dụng.' : 'Hãy thêm thành viên đầu tiên để xây dựng cây gia phả.'}
+                </div>
+                {treeData.members.length > 0 ? (
+                  <button className="btn btn-secondary" onClick={resetFilters}><IconFilter /> Đặt lại bộ lọc</button>
+                ) : (
+                  <button className="btn btn-primary" onClick={() => { setEditingMember(null); setModalOpen(true); }}>
+                    <IconPlus /> Thêm thành viên đầu tiên
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -783,8 +1007,16 @@ export default function FamilyTree() {
               onMouseUp={() => { dragRef.current = null; }}
               onMouseLeave={() => { dragRef.current = null; }}
             >
-              {/* Grid pattern */}
+              {/* Grid pattern + hover styles cho thẻ thành viên */}
               <defs>
+                <style>{`
+                  .gp-card-half { cursor: pointer; transition: transform 200ms ease; }
+                  .gp-card-half:hover { transform: translateY(-6px); }
+                  .gp-card-half:hover .gp-card-rect { filter: drop-shadow(0 8px 14px rgba(0,0,0,0.22)); }
+                  .gp-card-rect { transition: filter 200ms ease, stroke 200ms ease; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.12)); }
+                  .gp-card-rect.gp-card-rect--half { filter: none; }
+                  .gp-card-half:hover .gp-card-rect--half { filter: drop-shadow(0 8px 14px rgba(0,0,0,0.22)); }
+                `}</style>
                 <pattern id="grid" width={60} height={60} patternUnits="userSpaceOnUse">
                   <path d="M 60 0 L 0 0 0 60" fill="none" stroke="var(--color-border)" strokeWidth={0.5} opacity={0.4} />
                 </pattern>
@@ -814,14 +1046,16 @@ export default function FamilyTree() {
 
               {/* Nodes */}
               <g>
-                {layout.nodes.map(node => {
-                  const opacity = (!searchTerm || filteredIds.has(node.id)) ? 1 : 0.15;
+                {layout.nodes.filter(node => !node.mergedIntoPartner).map(node => {
+                  const relevantIds = node.partnerId ? [node.id, node.partnerId] : [node.id];
+                  const opacity = (!searchTerm || relevantIds.some(id => filteredIds.has(id))) ? 1 : 0.15;
                   return (
                     <g key={node.id} opacity={opacity}>
                       <NodeCard
                         member={node}
-                        isSelected={selectedNode?.id === node.id}
-                        onClick={setSelectedNode}
+                        selectedId={selectedNode?.id}
+                        onSelectId={selectNodeById}
+                        minimal={filters.minimalView}
                       />
                     </g>
                   );
@@ -831,9 +1065,9 @@ export default function FamilyTree() {
           )}
         </div>
 
-        {/* Right: Detail Panel */}
-        {selectedNode && (
-          <div role="dialog" aria-modal="true" aria-label={`Thông tin ${selectedNode.full_name}`} onClick={event => event.target === event.currentTarget && setSelectedNode(null)} style={{ position: 'fixed', inset: 0, zIndex: 30, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, animation: 'familyPanelIn 220ms ease-out' }}>
+        {/* Right: Detail Panel — render qua portal để không bị các container overflow/transform của layout che khuất */}
+        {selectedNode && createPortal(
+          <div role="dialog" aria-modal="true" aria-label={`Thông tin ${selectedNode.full_name}`} onClick={event => event.target === event.currentTarget && setSelectedNode(null)} style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, animation: 'familyPanelIn 220ms ease-out' }}>
             <div style={{ width: 'min(560px, 100%)', maxHeight: 'min(760px, 92vh)', background: 'var(--color-surface)', borderRadius: 14, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.3)' }}>
               <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--color-border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -939,7 +1173,8 @@ export default function FamilyTree() {
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
 
