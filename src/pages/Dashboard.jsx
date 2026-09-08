@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useFamilyTree } from "../contexts/FamilyTreeContext";
 import Navbar from "../components/Navbar";
 import eventService from "../services/eventService";
+import { formatLunarDate } from "../utils/lunarCalendar";
 
 const IconFamily = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -89,19 +90,11 @@ export default function Dashboard() {
           <div className="card" style={{ padding: 22 }}>
             <div style={{ color: "var(--color-text-muted)", fontSize: "0.76rem", fontWeight: 700, textTransform: "uppercase" }}>Hôm nay</div>
             <div style={{ fontSize: "1.45rem", fontWeight: 800, marginTop: 8 }}>{today.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
-            <div style={{ color: "var(--color-text-muted)", marginTop: 6 }}>Dương lịch · Âm lịch xem trong hồ sơ thành viên</div>
+            <div style={{ color: "var(--color-text-muted)", marginTop: 6 }}>Âm lịch: {formatLunarDate(today)}</div>
           </div>
           <div className="card" style={{ padding: 22 }}>
             <div style={{ color: "var(--color-text-muted)", fontSize: "0.76rem", fontWeight: 700, textTransform: "uppercase" }}>Sự kiện hôm nay và sắp tới</div>
-            {upcomingEvents.length
-              ? upcomingEvents.map(event => (
-                <div key={event.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: "1px solid var(--color-border)" }}>
-                  <span style={{ fontWeight: 650 }}>{event.title}</span>
-                  <span style={{ color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>{new Date(event.eventDate).toLocaleDateString('vi-VN')}</span>
-                </div>
-              ))
-              : <div style={{ color: "var(--color-text-muted)", marginTop: 10 }}>Chưa có sự kiện sắp tới.</div>
-            }
+            {upcomingEvents.length ? upcomingEvents.map(event => <div key={event.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: "1px solid var(--color-border)" }}><span style={{ fontWeight: 650 }}>{event.title}</span><span style={{ color: "var(--color-text-muted)", whiteSpace: "nowrap", textAlign: "right" }}>{new Date(event.eventDate).toLocaleDateString('vi-VN')}<br /><small>Âm: {formatLunarDate(event.eventDate)}</small></span></div>) : <div style={{ color: "var(--color-text-muted)", marginTop: 10 }}>Chưa có sự kiện sắp tới.</div>}
           </div>
         </div>
 

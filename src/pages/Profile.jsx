@@ -1,18 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import userService from '../services/userService';
 import authService from '../services/authService';
 import Navbar from '../components/Navbar';
 
 export default function Profile() {
-  const { user, login } = useAuth(); // We might need to update the context user
-  const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [toast, setToast] = useState(null);
+  const [activeTab, setActiveTab] = useState('profile');
 
   // Profile Form
   const [fullName, setFullName] = useState(user?.fullName || '');
@@ -33,7 +31,6 @@ export default function Profile() {
 
     setLoading(true);
     setError('');
-    setSuccess('');
     try {
       const res = await userService.updateProfile(fullName);
 
@@ -63,7 +60,6 @@ export default function Profile() {
 
     setLoading(true);
     setError('');
-    setSuccess('');
     try {
       await authService.changePassword(oldPassword, newPassword);
       showToast('Đổi mật khẩu thành công! Bạn có thể dùng mật khẩu mới từ lần đăng nhập sau.');
@@ -120,9 +116,17 @@ export default function Profile() {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }}>
-          {/* Cập nhật thông tin */}
-          <div className="card">
+        <div className="profile-tabs" role="tablist" aria-label="Thông tin cá nhân">
+          <button type="button" role="tab" aria-selected={activeTab === 'profile'} className={`profile-tab ${activeTab === 'profile' ? 'profile-tab-active' : ''}`} onClick={() => { setActiveTab('profile'); setError(''); }}>
+            Thông tin cá nhân
+          </button>
+          <button type="button" role="tab" aria-selected={activeTab === 'password'} className={`profile-tab ${activeTab === 'password' ? 'profile-tab-active' : ''}`} onClick={() => { setActiveTab('password'); setError(''); }}>
+            Đổi mật khẩu
+          </button>
+        </div>
+
+        <div className="profile-tab-panel" role="tabpanel">
+          {activeTab === 'profile' ? <div className="card profile-card">
             <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: 20, paddingBottom: 12, borderBottom: '1px solid var(--color-border)' }}>Thông tin chung</h2>
             <form onSubmit={handleUpdateProfile}>
               <div className="form-group">
@@ -157,10 +161,9 @@ export default function Profile() {
                 {loading ? 'Đang lưu...' : 'Lưu thay đổi'}
               </button>
             </form>
-          </div>
+          </div> : <div className="card profile-card">
 
           {/* Đổi mật khẩu */}
-          <div className="card">
             <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: 20, paddingBottom: 12, borderBottom: '1px solid var(--color-border)' }}>Đổi mật khẩu</h2>
             <form onSubmit={handleChangePassword}>
               <div className="form-group">
@@ -209,7 +212,7 @@ export default function Profile() {
                 {loading ? 'Đang lưu...' : 'Đổi mật khẩu'}
               </button>
             </form>
-          </div>
+          </div>}
         </div>
 
       </main>
