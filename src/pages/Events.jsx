@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import eventService from '../services/eventService';
@@ -16,6 +16,10 @@ export default function Events() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(true);
 
+    const [searchTitle, setSearchTitle] = useState('');
+    const [sortOrder, setSortOrder] = useState('asc');
+    const [filterType, setFilterType] = useState('all');
+
     const load = async () => {
         setLoading(true); setError('');
         try { const [eventData, memberData] = await Promise.all([eventService.getEvents(), memberService.getMembers()]); setEvents(eventData); setMembers(memberData); }
@@ -23,6 +27,7 @@ export default function Events() {
         finally { setLoading(false); }
     };
     useEffect(() => { load(); }, []);
+
     const save = async event => {
         event.preventDefault(); setError('');
         try { await eventService.createEvent({ ...form, memberId: form.memberId || null }); setForm({ title: '', eventType: 'custom', eventDate: '', memberId: '', description: '', isRecurringYearly: false }); await load(); }
@@ -52,3 +57,4 @@ export default function Events() {
         <div className="card" style={{ padding: 16, overflowX: 'auto' }}>{loading ? <div style={{ padding: 30, textAlign: 'center' }}>Đang tải...</div> : <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 980 }}><thead><tr style={{ textAlign: 'left', borderBottom: '1px solid var(--color-border)' }}><th style={{ padding: 12 }}>Ngày dương</th><th style={{ padding: 12 }}>Năm</th><th style={{ padding: 12 }}>Ngày âm lịch</th><th style={{ padding: 12 }}>Sự kiện</th><th style={{ padding: 12 }}>Thành viên</th><th style={{ padding: 12 }}>Thông tin chi tiết</th><th style={{ padding: 12 }}>Thao tác</th></tr></thead><tbody>{events.map(item => { const solarDate = formatSolarDate(item.eventDate); return <tr key={item.id} style={{ borderBottom: '1px solid var(--color-border)', verticalAlign: 'top' }}><td style={{ padding: 12, whiteSpace: 'nowrap' }}>{solarDate.day}</td><td style={{ padding: 12 }}>{solarDate.year}</td><td style={{ padding: 12, whiteSpace: 'nowrap' }}>{formatEventLunarDate(item)}</td><td style={{ padding: 12 }}><strong>{item.title}</strong><div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginTop: 4 }}>{typeName[item.eventType] || item.eventType}</div>{item.isRecurringYearly && <span className="chip" style={{ marginTop: 6, display: 'inline-block' }}>Hàng năm</span>}</td><td style={{ padding: 12 }}>{item.memberName || 'Toàn dòng họ'}</td><td style={{ padding: 12, minWidth: 220 }}>{item.description || 'Không có mô tả'}{item.images?.length > 0 && <div style={{ color: 'var(--color-text-muted)', fontSize: '.8rem', marginTop: 6 }}>{item.images.length} hình ảnh đính kèm</div>}</td><td style={{ padding: 12 }}>{canManage && <button className="btn btn-sm" style={{ color: '#ef4444' }} onClick={() => remove(item.id)}>Xóa</button>}</td></tr>; })}</tbody></table>}{!loading && events.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: 'var(--color-text-muted)' }}>Chưa có sự kiện.</div>}</div>
     </main></div>;
 }
+
