@@ -2,11 +2,38 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import eventService from '../services/eventService';
+import galleryService from '../services/galleryService';
 import memberService from '../services/memberService';
 import { useFamilyTree } from '../contexts/FamilyTreeContext';
+import EventAlbumModal from '../components/EventAlbumModal';
+
+const emptyForm = { title: '', eventType: 'custom', eventDate: '', memberId: '', description: '', isRecurringYearly: false };
+const typeName = { custom: 'Sự kiện', birthday: 'Sinh nhật', death_anniversary: 'Ngày giỗ' };
+
+function EventModal({ open, event, members, saving, onClose, onSave }) {
+    const [form, setForm] = useState(emptyForm);
+    const [files, setFiles] = useState([]);
+    useEffect(() => {
+        if (!open) return;
+        setForm(event ? { title: event.title, eventType: event.eventType, eventDate: event.eventDate?.slice(0, 10), memberId: event.memberId || '', description: event.description || '', isRecurringYearly: event.isRecurringYearly } : emptyForm);
+        setFiles([]);
+    }, [open, event]);
+    if (!open) return null;
+    return <div className="dialog-overlay" role="presentation" onMouseDown={e => e.target === e.currentTarget && onClose()}><form className="dialog" onSubmit={e => { e.preventDefault(); onSave(form, files); }}>
+        <div className="dialog-header"><h2>{event ? 'Sửa sự kiện' : 'Thêm sự kiện'}</h2><button type="button" className="dialog-close" onClick={onClose}>×</button></div>
+        <div className="dialog-body"><div className="dialog-form-grid">
+            <label className="dialog-field dialog-field--wide">Tên sự kiện<input className="input" required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></label>
+            <label className="dialog-field">Loại<select className="input" value={form.eventType} onChange={e => setForm({ ...form, eventType: e.target.value })}><option value="custom">Sự kiện</option><option value="birthday">Sinh nhật</option><option value="death_anniversary">Ngày giỗ</option></select></label>
+            <label className="dialog-field">Ngày<input className="input" type="date" required value={form.eventDate} onChange={e => setForm({ ...form, eventDate: e.target.value })} /></label>
+            <label className="dialog-field">Thành viên<select className="input" value={form.memberId} onChange={e => setForm({ ...form, memberId: e.target.value })}><option value="">Không gắn thành viên</option>{members.map(member => <option key={member.id} value={member.id}>{member.fullName}</option>)}</select></label>
+            <label className="dialog-field dialog-field--wide">Mô tả<textarea className="input" style={{ minHeight: 90, paddingTop: 10, resize: 'vertical' }} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></label>
+            <label className="dialog-field dialog-field--wide">Ảnh sự kiện<input className="input" type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" onChange={e => setFiles([...e.target.files])} /><small style={{ color: 'var(--color-text-muted)' }}>Có thể chọn nhiều ảnh</small></label>
+        </div><label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14 }}><input type="checkbox" checked={form.isRecurringYearly} onChange={e => setForm({ ...form, isRecurringYearly: e.target.checked })} /> Lặp lại hàng năm</label></div>
+        <div className="dialog-footer"><button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>Hủy</button><button className="btn btn-primary" disabled={saving}>{saving ? 'Đang lưu...' : event ? 'Cập nhật' : 'Thêm sự kiện'}</button></div>
+    </form></div>;
+}
 
 export default function Events() {
-    const navigate = useNavigate();
     const { hasPermission } = useFamilyTree();
     const canManage = hasPermission('event.manage');
     const [events, setEvents] = useState([]);

@@ -1,26 +1,27 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import familyTreeService from "../services/familyTreeService";
 
 const IconLock = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
   </svg>
 );
 const IconEye = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
   </svg>
 );
 const IconEyeOff = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-    <line x1="1" y1="1" x2="23" y2="23"/>
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+    <line x1="1" y1="1" x2="23" y2="23" />
   </svg>
 );
 const IconAlert = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
   </svg>
 );
 
@@ -38,12 +39,12 @@ function PasswordStrength({ password }) {
   return (
     <div style={{ marginTop: "10px" }}>
       <div style={{ display: "flex", gap: "4px", marginBottom: "8px" }}>
-        {[0,1,2].map(i => (
+        {[0, 1, 2].map(i => (
           <div key={i} style={{
             flex: 1, height: "4px", borderRadius: "2px",
             background: i < score ? colors[score - 1] : "var(--color-border)",
             transition: "background 0.3s ease"
-          }}/>
+          }} />
         ))}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -54,7 +55,7 @@ function PasswordStrength({ password }) {
           {checks.map(c => (
             <span key={c.label} style={{ fontSize: "0.7rem", color: c.ok ? "#22c55e" : "var(--color-text-tertiary)", display: "flex", alignItems: "center", gap: "3px" }}>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={c.ok ? "#22c55e" : "var(--color-text-tertiary)"} strokeWidth="3">
-                {c.ok ? <polyline points="20 6 9 17 4 12"/> : <line x1="18" y1="6" x2="6" y2="18"/>}
+                {c.ok ? <polyline points="20 6 9 17 4 12" /> : <line x1="18" y1="6" x2="6" y2="18" />}
               </svg>
               {c.label}
             </span>
@@ -89,8 +90,8 @@ export default function ChangePassword() {
     setError(""); setLoading(true);
     try {
       await changePassword(form.oldPassword, form.newPassword);
-      // Điều hướng sang onboarding hoặc select-tree
-      navigate("/onboarding");
+      const trees = await familyTreeService.getMyTrees();
+      navigate(Array.isArray(trees) && trees.length > 0 ? "/select-tree" : "/onboarding");
     } catch (err) {
       setError(err.response?.data?.message || "Đổi mật khẩu thất bại. Vui lòng thử lại.");
     } finally {
@@ -109,13 +110,13 @@ export default function ChangePassword() {
               display: "flex", alignItems: "center", justifyContent: "center"
             }}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
             </div>
           </div>
-          <p className="auth-visual-title">Bảo mật<br/>tài khoản</p>
+          <p className="auth-visual-title">Bảo mật<br />tài khoản</p>
           <p className="auth-visual-sub">
-            Bạn đang dùng mật khẩu tạm thời.<br/>
+            Bạn đang dùng mật khẩu tạm thời.<br />
             Hãy đặt mật khẩu mới để bảo vệ tài khoản.
           </p>
           <div style={{ marginTop: "40px" }}>
@@ -126,7 +127,7 @@ export default function ChangePassword() {
             ].map((tip) => (
               <div key={tip} style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "14px", color: "rgba(255,255,255,0.8)", fontSize: "0.875rem", lineHeight: 1.5 }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" style={{ flexShrink: 0, marginTop: "2px" }}>
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
                 {tip}
               </div>
