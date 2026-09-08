@@ -8,6 +8,7 @@
 const NODE_WIDTH = 160;
 const NODE_HEIGHT = 150;   // tăng nhẹ để chứa avatar to hơn
 const H_SPACING = 40;      // Khoảng cách ngang giữa các node (không cùng cặp chính)
+const BRANCH_GAP = 100;    // Khoảng hở lớn hơn giữa 2 nhánh khác nhau (con của 2 cặp cha/mẹ khác nhau ở cùng 1 đời)
 const V_SPACING = 80;      // Khoảng cách dọc giữa các thế hệ
 const RING_GAP = 30;       // Khoảng hở giữa 2 nửa của thẻ vợ chồng gộp chung (chỗ đặt icon nhẫn)
 const AVATAR_RADIUS = 32;  // bán kính avatar trong thẻ (trước đây 25)
@@ -258,14 +259,22 @@ export function computeTreeLayout(members, relationships, options = {}) {
     }).sort((a, b) => a.x - b.x);
 
     let previousRight = Number.NEGATIVE_INFINITY;
+    let previousParentKey = null;
     for (const item of desired) {
-      const left = Math.max(item.x - item.block.width / 2, previousRight + H_SPACING);
+      // Nếu khối này thuộc nhóm cha/mẹ khác với khối liền trước (khác nhánh), thêm khoảng hở lớn hơn
+      // để các nhánh (con của từng cặp cha mẹ khác nhau) tách biệt rõ ràng, dễ nhìn hơn khi cây rộng.
+      const parentIds = item.block.members.flatMap(member => parentsByPersonId.get(member.id) || []);
+      const parentKey = parentIds.length > 0 ? [...new Set(parentIds)].sort().join(',') : null;
+      const isNewBranch = previousParentKey != null && parentKey != null && parentKey !== previousParentKey;
+      const gapBefore = isNewBranch ? BRANCH_GAP : H_SPACING;
+      const left = Math.max(item.x - item.block.width / 2, previousRight + gapBefore);
       let cursor = left;
       for (const member of item.block.members) {
         positionMap.set(member.id, { x: cursor, y: positionMap.get(member.id)?.y ?? 0 });
         cursor += widthOf(member.id) + RING_GAP;
       }
       previousRight = left + item.block.width;
+      previousParentKey = parentKey ?? previousParentKey;
     }
 
     // Keep each generation centered after collision spacing, producing a stable pyramid.
@@ -368,38 +377,95 @@ export function computeTreeLayout(members, relationships, options = {}) {
   const edges = [];
   const addedEdges = new Set();
 
+  // Gom quan hệ cha/mẹ-con theo "nhóm cha mẹ" (1 người hoặc 1 cặp vợ chồng cùng hàng)
+  // để tính điểm giữa (trunkX) theo chính các con của nhóm đó, rồi mới rẽ nhánh xuống từng con.
+  // parentGroupKey: id nhỏ nhất trong nhóm cha mẹ (ổn định, không phụ thuộc thứ tự quan hệ).
+  const parentChildRels = (Array.isArray(relationships) ? relationships : [])
+    .filter(rel => rel?.person_a && rel?.person_b && rel.type !== 'marriage');
+
+  const parentGroupKeyOf = (personId) => {
+    const spouseId = (spousesByPersonId.get(personId) || []).find(id => positionMap.get(id)?.y === positionMap.get(personId)?.y);
+    if (!spouseId) return String(personId);
+    return [String(personId), String(spouseId)].sort().join('|');
+  };
+
+  const groups = new Map(); // groupKey -> { parentIds: Set, childRels: [] }
+  for (const rel of parentChildRels) {
+    const groupKey = parentGroupKeyOf(rel.person_a);
+    if (!groups.has(groupKey)) groups.set(groupKey, { parentIds: new Set(), childRels: [] });
+    const group = groups.get(groupKey);
+    group.parentIds.add(rel.person_a);
+    group.childRels.push(rel);
+  }
+
+  for (const group of groups.values()) {
+    const parentIds = [...group.parentIds];
+    const parentPositions = parentIds.map(pid => positionMap.get(pid)).filter(Boolean);
+    if (parentPositions.length === 0) continue;
+    const parentCenters = parentIds.map(pid => {
+      const pos = positionMap.get(pid);
+      return pos ? pos.x + widthOf(pid) / 2 : null;
+    }).filter(x => x != null);
+    const parentX = parentCenters.reduce((sum, x) => sum + x, 0) / parentCenters.length;
+    const parentY = Math.max(...parentPositions.map(p => p.y)) + cardHeight;
+
+    // Điểm giữa (trunkX) = trung điểm bề rộng của chính các con thuộc nhóm cha mẹ này,
+    // giúp nhánh kéo ra đến giữa các con rồi mới rẽ thẳng xuống thay vì rẽ lệch ngay dưới cha mẹ.
+    const childCenters = group.childRels
+      .map(rel => {
+        const pos = positionMap.get(rel.person_b);
+        return pos ? pos.x + widthOf(rel.person_b) / 2 : null;
+      })
+      .filter(x => x != null);
+    if (childCenters.length === 0) continue;
+    const trunkX = (Math.min(...childCenters) + Math.max(...childCenters)) / 2;
+    const trunkY = parentY + V_SPACING * 0.42;
+
+    for (const rel of group.childRels) {
+      const key = `${rel.person_a}-${rel.person_b}-${rel.type}`;
+      if (addedEdges.has(key)) continue;
+      addedEdges.add(key);
+
+      const posB = positionMap.get(rel.person_b);
+      if (!posB) continue;
+      const widthB = widthOf(rel.person_b);
+
+      edges.push({
+        id: key,
+        type: rel.type,
+        fromId: rel.person_a,
+        toId: rel.person_b,
+        parentX, parentY, trunkX, trunkY,
+        x2: posB.x + widthB / 2,
+        y2: posB.y,
+        order: rel.order,
+      });
+    }
+  }
+
+  // Quan hệ vợ chồng "phụ" (đa thê/tái hôn) — không bị gộp chung thẻ, cần vẽ đường nối riêng.
   for (const rel of Array.isArray(relationships) ? relationships : []) {
-    if (!rel?.person_a || !rel?.person_b) continue;
+    if (!rel?.person_a || !rel?.person_b || rel.type !== 'marriage') continue;
     const key = `${rel.person_a}-${rel.person_b}-${rel.type}`;
     if (addedEdges.has(key)) continue;
+    if (primaryPartnerOf.get(rel.person_a) === rel.person_b) continue; // đã gộp chung 1 thẻ
     addedEdges.add(key);
 
     const posA = positionMap.get(rel.person_a);
     const posB = positionMap.get(rel.person_b);
     if (!posA || !posB) continue;
-
-    // Cặp vợ chồng chính đã được gộp chung 1 thẻ (nhẫn vẽ ngay trong thẻ) -> không cần vẽ đường nối riêng.
-    if (rel.type === 'marriage' && primaryPartnerOf.get(rel.person_a) === rel.person_b) continue;
-
     const widthA = widthOf(rel.person_a);
     const widthB = widthOf(rel.person_b);
-    let parentX = posA.x + widthA / 2;
-    let parentY = posA.y + cardHeight;
-    if (rel.type !== 'marriage') {
-      const spouseId = (spousesByPersonId.get(rel.person_a) || []).find(id => positionMap.get(id)?.y === posA.y);
-      const spousePosition = spouseId ? positionMap.get(spouseId) : null;
-      if (spousePosition) parentX = (parentX + spousePosition.x + widthOf(spouseId) / 2) / 2;
-    }
 
     edges.push({
       id: key,
       type: rel.type,
       fromId: rel.person_a,
       toId: rel.person_b,
-      x1: rel.type === 'marriage' ? posA.x + widthA / 2 : parentX,
-      y1: rel.type === 'marriage' ? posA.y + cardHeight / 2 : parentY,
+      x1: posA.x + widthA / 2,
+      y1: posA.y + cardHeight / 2,
       x2: posB.x + widthB / 2,
-      y2: rel.type === 'marriage' ? posB.y + cardHeight / 2 : posB.y,
+      y2: posB.y + cardHeight / 2,
       order: rel.order,
     });
   }

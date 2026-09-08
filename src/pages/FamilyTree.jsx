@@ -199,7 +199,7 @@ export function MemberFormModal({ open, onClose, onSave, members, editingMember 
 
   if (!open) return null;
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 2100, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ background: 'var(--color-surface)', borderRadius: 16, width: '100%', maxWidth: 680, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', border: '1px solid var(--color-border)' }}>
         {/* Header */}
         <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -526,6 +526,24 @@ function NodeCard({ member, selectedId, onSelectId, minimal }) {
   );
 }
 
+/* ─── Avatar tròn dùng chung cho popup chi tiết (cha mẹ / vợ chồng / con cái) ─── */
+function PersonAvatar({ person, size = 40 }) {
+  const colors = GENDER_COLORS[person?.gender] || GENDER_COLORS.other;
+  const initials = person?.full_name?.split(' ').slice(-2).map(w => w[0]).join('').toUpperCase() || '?';
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%', flexShrink: 0,
+      background: colors.bg, border: `2px solid ${colors.border}`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.34, fontWeight: 700, color: colors.text, overflow: 'hidden'
+    }}>
+      {person?.avatar_url ? (
+        <img src={person.avatar_url.startsWith('http') ? person.avatar_url : `${API_ORIGIN}${person.avatar_url}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      ) : initials}
+    </div>
+  );
+}
+
 /* ─── Main FamilyTree Page ──────────────────────────────────── */
 export default function FamilyTree() {
   const navigate = useNavigate();
@@ -542,6 +560,9 @@ export default function FamilyTree() {
   const [relationForm, setRelationForm] = useState({ type: 'parent', targetId: '' });
   const [relationSaving, setRelationSaving] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
+  // Nếu mở popup Sửa từ popup Chi tiết, lưu lại id thành viên đó để khi đóng/hủy popup Sửa
+  // thì tự động mở lại popup Chi tiết (thay vì đóng luôn cả 2).
+  const returnToDetailIdRef = useRef(null);
   const [kinship, setKinship] = useState(null);
   const [kinshipFrom, setKinshipFrom] = useState('');
   const [kinshipTo, setKinshipTo] = useState('');
@@ -626,6 +647,7 @@ export default function FamilyTree() {
 
   useEffect(() => {
     if (searchParams.get('action') === 'create' && !loading) {
+      returnToDetailIdRef.current = null;
       setEditingMember(null);
       setModalOpen(true);
     }
@@ -646,7 +668,24 @@ export default function FamilyTree() {
     if (avatarFile && memberId) {
       await memberService.uploadAvatar(memberId, avatarFile);
     }
-    await loadData();
+    const computed = await loadData();
+    // Nếu popup Sửa được mở từ popup Chi tiết, sau khi lưu thành công mở lại popup Chi tiết
+    // với dữ liệu mới nhất của chính thành viên đó.
+    if (returnToDetailIdRef.current != null) {
+      const reopenId = returnToDetailIdRef.current;
+      setSelectedNode(computed?.nodes.find(node => node.id === reopenId) || null);
+      returnToDetailIdRef.current = null;
+    }
+  };
+
+  // Đóng popup Thêm/Sửa. Nếu popup này được mở từ popup Chi tiết (Sửa), mở lại popup Chi tiết.
+  const handleModalClose = () => {
+    setModalOpen(false);
+    if (returnToDetailIdRef.current != null) {
+      const reopenId = returnToDetailIdRef.current;
+      returnToDetailIdRef.current = null;
+      setSelectedNode(nodeById.get(String(reopenId)) || nodeById.get(reopenId) || null);
+    }
   };
 
   const handleDelete = async (memberId) => {
@@ -731,25 +770,91 @@ export default function FamilyTree() {
     dragRef.current = { clientX: event.clientX, clientY: event.clientY };
   };
 
+  /**
+   * Các thuộc tính SVG có thể mang giá trị `var(--color-...)` cần được "đóng băng" thành màu thực tế
+   * trước khi xuất file, vì SVG xuất ra (PNG/PDF) không còn nằm trong cây DOM của trang nên trình duyệt
+   * không resolve được biến CSS custom properties — kết quả là toàn bộ fill/stroke render ra màu đen/mặc định.
+   */
+  const COLOR_ATTRS = ['fill', 'stroke', 'stop-color'];
+  const inlineResolvedColors = (liveRoot, cloneRoot) => {
+    const liveEls = liveRoot.querySelectorAll('*');
+    const cloneEls = cloneRoot.querySelectorAll('*');
+    const resolveNode = (liveEl, cloneEl) => {
+      const computed = window.getComputedStyle(liveEl);
+      for (const attr of COLOR_ATTRS) {
+        const raw = liveEl.getAttribute(attr);
+        if (raw && raw.includes('var(')) {
+          const cssProp = attr === 'stop-color' ? 'stop-color' : attr;
+          const resolved = computed.getPropertyValue(cssProp) || computed[attr];
+          if (resolved) cloneEl.setAttribute(attr, resolved.trim());
+        }
+      }
+      // Inline style cũng có thể chứa var(--color-...) (vd: filter: drop-shadow, background trong foreignObject)
+      if (liveEl.style && liveEl.style.cssText && liveEl.style.cssText.includes('var(')) {
+        const style = liveEl.style;
+        for (let i = 0; i < style.length; i++) {
+          const prop = style[i];
+          if (style.getPropertyValue(prop).includes('var(')) {
+            const resolvedValue = computed.getPropertyValue(prop);
+            if (resolvedValue) cloneEl.style.setProperty(prop, resolvedValue.trim());
+          }
+        }
+      }
+    };
+    resolveNode(liveRoot, cloneRoot);
+    liveEls.forEach((liveEl, index) => {
+      const cloneEl = cloneEls[index];
+      if (cloneEl) resolveNode(liveEl, cloneEl);
+    });
+  };
+
+  const buildExportSvg = () => {
+    if (!svgRef.current) return null;
+    const clone = svgRef.current.cloneNode(true);
+    inlineResolvedColors(svgRef.current, clone);
+    // Nền trắng/màu nền thực tế phía sau toàn bộ cây (thay vì để trong suốt -> có thể ra màu đen khi vẽ canvas).
+    const bg = window.getComputedStyle(svgRef.current).getPropertyValue('background-color')
+      || window.getComputedStyle(document.body).getPropertyValue('--color-bg') || '#ffffff';
+    clone.style.background = bg;
+    clone.setAttribute('style', (clone.getAttribute('style') || '') + `;background:${bg};`);
+    return clone;
+  };
+
   const exportTreePng = () => {
-    if (!svgRef.current) return;
-    const svg = new XMLSerializer().serializeToString(svgRef.current);
+    const clone = buildExportSvg();
+    if (!clone) return;
+    const bbox = svgRef.current.getBBox ? svgRef.current.getBBox() : null;
+    const width = clone.viewBox.baseVal?.width || bbox?.width || 1600;
+    const height = clone.viewBox.baseVal?.height || bbox?.height || 900;
+    clone.setAttribute('width', width);
+    clone.setAttribute('height', height);
+    const svgString = new XMLSerializer().serializeToString(clone);
     const image = new Image();
     image.onload = () => {
+      const scale = 2;
       const canvas = document.createElement('canvas');
-      canvas.width = image.width * 2; canvas.height = image.height * 2;
-      canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+      canvas.width = width * scale; canvas.height = height * scale;
+      const ctx = canvas.getContext('2d');
+      const bg = clone.style.background || '#ffffff';
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
       const link = document.createElement('a'); link.download = 'cay-gia-pha.png'; link.href = canvas.toDataURL('image/png'); link.click();
     };
-    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    image.onerror = () => showToast('Không thể xuất PNG.', 'error');
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgString)}`;
   };
 
   const exportTreePdf = () => {
-    if (!svgRef.current) return;
+    const clone = buildExportSvg();
+    if (!clone) return;
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
-    printWindow.document.write(`<html><head><title>Cây gia phả</title></head><body>${svgRef.current.outerHTML}</body></html>`);
-    printWindow.document.close(); printWindow.focus(); printWindow.print();
+    const bg = clone.style.background || '#ffffff';
+    printWindow.document.write(`<html><head><title>Cây gia phả</title><style>html,body{margin:0;background:${bg};}</style></head><body>${clone.outerHTML}</body></html>`);
+    printWindow.document.close(); printWindow.focus();
+    printWindow.onload = () => printWindow.print();
+    setTimeout(() => printWindow.print(), 300);
   };
 
   const filteredNodes = layout.nodes.filter(n =>
@@ -763,6 +868,50 @@ export default function FamilyTree() {
   const selectedParents = selectedRelations.filter(relation => relation.type === 'biological_child' || relation.type === 'adopted_child').filter(relation => relation.person_b === selectedNode?.id);
   const selectedChildren = selectedRelations.filter(relation => relation.type === 'biological_child' || relation.type === 'adopted_child').filter(relation => relation.person_a === selectedNode?.id);
   const selectedSpouses = selectedRelations.filter(relation => relation.type === 'marriage');
+
+  // Thống kê hậu duệ (con ruột theo giới tính, dâu/rể, cháu nội/ngoại) để hiển thị ở popup chi tiết.
+  const computeDescendantStats = (node) => {
+    if (!node) return null;
+    const childIds = selectedChildren.map(relation => relation.person_b);
+    const childNodes = childIds.map(id => nodeById.get(String(id))).filter(Boolean);
+    const sonCount = childNodes.filter(child => child.gender === 'male').length;
+    const daughterCount = childNodes.filter(child => child.gender === 'female').length;
+
+    // Dâu/Rể: vợ/chồng của các con (không tính chính selectedNode/vợ-chồng của selectedNode).
+    const inLawIds = new Set();
+    let sonsInLaw = 0, daughtersInLaw = 0; // rể (chồng của con gái) / dâu (vợ của con trai)
+    for (const child of childNodes) {
+      const spouseRelations = treeData.relationships.filter(relation => relation.type === 'marriage' && (relation.person_a === child.id || relation.person_b === child.id));
+      for (const relation of spouseRelations) {
+        const spouseId = relation.person_a === child.id ? relation.person_b : relation.person_a;
+        if (inLawIds.has(spouseId)) continue;
+        inLawIds.add(spouseId);
+        const spouseNode = nodeById.get(String(spouseId));
+        if (child.gender === 'male') daughtersInLaw += 1; // con trai lấy vợ -> con dâu
+        else if (child.gender === 'female') sonsInLaw += 1; // con gái lấy chồng -> con rể
+        void spouseNode;
+      }
+    }
+
+    // Cháu nội (qua con trai) / cháu ngoại (qua con gái).
+    let grandsonsPaternal = 0, grandsonsMaternal = 0;
+    let paternalGrandchildren = 0, maternalGrandchildren = 0;
+    for (const child of childNodes) {
+      const grandchildRelations = treeData.relationships.filter(relation => (relation.type === 'biological_child' || relation.type === 'adopted_child') && relation.person_a === child.id);
+      const count = grandchildRelations.length;
+      if (child.gender === 'male') paternalGrandchildren += count;
+      else if (child.gender === 'female') maternalGrandchildren += count;
+      void grandsonsPaternal; void grandsonsMaternal;
+    }
+
+    return {
+      sonCount, daughterCount,
+      totalChildren: childNodes.length,
+      sonsInLaw, daughtersInLaw,
+      paternalGrandchildren, maternalGrandchildren,
+    };
+  };
+  const descendantStats = computeDescendantStats(selectedNode);
 
   const edgeColor = (type) => type === 'marriage' ? '#f59e0b' : 'var(--color-border)';
 
@@ -791,7 +940,7 @@ export default function FamilyTree() {
             <button className="btn btn-ghost btn-sm" title="Đặt lại 100%" onClick={() => { setTreeZoom(1); setTreePan({ x: 0, y: 0 }); }} style={{ minWidth: 52 }}>{Math.round(treeZoom * 100)}%</button>
             <button className="btn btn-secondary btn-sm" title="Phóng to cây" onClick={() => changeTreeZoom(0.1)}><IconPlus /></button>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={() => { setEditingMember(null); setModalOpen(true); }}><IconPlus /> Thêm</button>
+          <button className="btn btn-primary btn-sm" onClick={() => { returnToDetailIdRef.current = null; setEditingMember(null); setModalOpen(true); }}><IconPlus /> Thêm</button>
 
           {/* Bộ lọc hiển thị */}
           <div style={{ position: 'relative' }}>
@@ -986,7 +1135,7 @@ export default function FamilyTree() {
                 {treeData.members.length > 0 ? (
                   <button className="btn btn-secondary" onClick={resetFilters}><IconFilter /> Đặt lại bộ lọc</button>
                 ) : (
-                  <button className="btn btn-primary" onClick={() => { setEditingMember(null); setModalOpen(true); }}>
+                  <button className="btn btn-primary" onClick={() => { returnToDetailIdRef.current = null; setEditingMember(null); setModalOpen(true); }}>
                     <IconPlus /> Thêm thành viên đầu tiên
                   </button>
                 )}
@@ -1027,20 +1176,36 @@ export default function FamilyTree() {
               <g>
                 {layout.edges.map(edge => {
                   const opacity = (!searchTerm || (filteredIds.has(edge.fromId) && filteredIds.has(edge.toId))) ? 1 : 0.1;
-                  return (
-                    edge.type === 'marriage' ? <>
-                      <path key={edge.id} d={`M ${edge.x1} ${edge.y1} L ${edge.x2} ${edge.y2}`} fill="none" stroke={edgeColor(edge.type)} strokeWidth="3" opacity={opacity} />
+                  if (edge.type === 'marriage') {
+                    return <g key={edge.id}>
+                      <path d={`M ${edge.x1} ${edge.y1} L ${edge.x2} ${edge.y2}`} fill="none" stroke={edgeColor(edge.type)} strokeWidth="3" opacity={opacity} />
                       <text x={(edge.x1 + edge.x2) / 2} y={(edge.y1 + edge.y2) / 2 + 5} textAnchor="middle" fontSize="18" aria-label="Vợ chồng">💍</text>
-                    </> : <path key={edge.id}
-                      d={`M ${edge.x1} ${edge.y1} V ${edge.y1 + (edge.y2 - edge.y1) * 0.42} C ${edge.x1} ${edge.y1 + (edge.y2 - edge.y1) * 0.52} ${edge.x2} ${edge.y1 + (edge.y2 - edge.y1) * 0.48} ${edge.x2} ${edge.y2}`}
-                      fill="none"
-                      stroke={edgeColor(edge.type)}
-                      strokeWidth="2.75"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      opacity={opacity}
-                    />
-                  );
+                    </g>;
+                  }
+                  // Nhánh cha/mẹ → con: đi thẳng xuống từ cha/mẹ đến "điểm giữa" (trunkX, tính theo chính
+                  // các con của nhóm cha mẹ này), rồi mới rẽ ngang sang từng con và đi thẳng xuống — tránh
+                  // việc rẽ lệch ngay dưới cha mẹ khi 1 nhánh có nhiều con hơn hẳn các nhánh khác.
+                  const r = 10; // bán kính bo góc nhẹ cho các khúc rẽ
+                  const dir = edge.x2 >= edge.trunkX ? 1 : -1;
+                  const sameX = Math.abs(edge.x2 - edge.trunkX) < 0.5;
+
+                  let d = `M ${edge.parentX} ${edge.parentY} L ${edge.trunkX} ${edge.parentY} V ${edge.trunkY}`;
+                  if (!sameX) {
+                    d += ` Q ${edge.trunkX} ${edge.trunkY} ${edge.trunkX + dir * r} ${edge.trunkY}`;
+                    d += ` H ${edge.x2 - dir * r}`;
+                    d += ` Q ${edge.x2} ${edge.trunkY} ${edge.x2} ${edge.trunkY + r}`;
+                  }
+                  d += ` V ${edge.y2}`;
+
+                  return <path key={edge.id}
+                    d={d}
+                    fill="none"
+                    stroke={edgeColor(edge.type)}
+                    strokeWidth="2.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={opacity}
+                  />;
                 })}
               </g>
 
@@ -1068,103 +1233,196 @@ export default function FamilyTree() {
         {/* Right: Detail Panel — render qua portal để không bị các container overflow/transform của layout che khuất */}
         {selectedNode && createPortal(
           <div role="dialog" aria-modal="true" aria-label={`Thông tin ${selectedNode.full_name}`} onClick={event => event.target === event.currentTarget && setSelectedNode(null)} style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, animation: 'familyPanelIn 220ms ease-out' }}>
-            <div style={{ width: 'min(560px, 100%)', maxHeight: 'min(760px, 92vh)', background: 'var(--color-surface)', borderRadius: 14, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.3)' }}>
-              <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--color-border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Chi tiết</span>
-                  <button onClick={() => setSelectedNode(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}>✕</button>
+            <div style={{ width: 'min(680px, 100%)', maxHeight: 'min(820px, 92vh)', background: 'var(--color-surface)', borderRadius: 16, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.3)' }}>
+              <style>{`
+                .gp-relation-row { border-radius: 8px; transition: background 150ms ease, transform 150ms ease; }
+                .gp-relation-row:hover { background: var(--color-surface-alt); transform: translateX(2px); }
+              `}</style>
+
+              {/* Header: avatar (trái) + tên/trạng thái/đời (phải), nút Xem/Sửa/Đóng */}
+              <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                <PersonAvatar person={selectedNode} size={56} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--color-text-primary)' }}>{selectedNode.full_name}</span>
+                    {!selectedNode.isAlive && (
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'rgba(107,114,128,0.15)', color: 'var(--color-text-secondary)' }}>Đã mất</span>
+                    )}
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'rgba(34,197,94,0.15)', color: '#16a34a' }}>Đời thứ {selectedNode.generation}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 18, marginTop: 6, flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
+                      <span style={{ color: 'var(--color-text-muted)' }}>Sinh: </span>
+                      {[selectedNode.birth_day, selectedNode.birth_month, selectedNode.birth_year].filter(Boolean).join('/') || selectedNode.birth_year || 'Chưa rõ'}
+                    </div>
+                    {!selectedNode.isAlive && (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
+                        <span style={{ color: 'var(--color-text-muted)' }}>Mất: </span>
+                        {[selectedNode.death_day, selectedNode.death_month, selectedNode.death_year].filter(Boolean).join('/') || selectedNode.death_year || 'Chưa rõ'}
+                      </div>
+                    )}
+                  </div>
                 </div>
+                <button onClick={() => setSelectedNode(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: '1.1rem', padding: 4 }} aria-label="Đóng">✕</button>
               </div>
-              <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
-                {/* Avatar */}
-                <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                  <div style={{
-                    width: 64, height: 64, borderRadius: 16, margin: '0 auto 8px',
-                    background: (GENDER_COLORS[selectedNode.gender] || GENDER_COLORS.other).bg,
-                    border: `2px solid ${(GENDER_COLORS[selectedNode.gender] || GENDER_COLORS.other).border}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '1.5rem', fontWeight: 700,
-                    color: (GENDER_COLORS[selectedNode.gender] || GENDER_COLORS.other).text
-                  }}>
-                    {selectedNode.avatar_url ? (
-                      <img src={selectedNode.avatar_url.startsWith('http') ? selectedNode.avatar_url : `${API_ORIGIN}${selectedNode.avatar_url}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 14 }} />
-                    ) : selectedNode.full_name?.split(' ').slice(-2).map(w => w[0]).join('').toUpperCase()}
-                  </div>
-                  <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text-primary)' }}>{selectedNode.full_name}</div>
-                  {!selectedNode.isAlive && <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>† Đã mất</div>}
-                </div>
 
-                {[
-                  ['Giới tính', selectedNode.gender === 'male' ? 'Nam' : selectedNode.gender === 'female' ? 'Nữ' : 'Khác'],
-                  ['Đời thứ', `Đời ${selectedNode.generation}`],
-                  ['Năm sinh', selectedNode.birth_year || 'Không rõ'],
-                  ['Năm mất', !selectedNode.isAlive ? (selectedNode.death_year || 'Không rõ') : null],
-                  ['Tên húy', selectedNode.taboo_name || null],
-                  ['Tên tự / tên khác', selectedNode.courtesy_name || null],
-                  ['Tên khác', selectedNode.other_names || null],
-                  ['Thứ tự sinh', selectedNode.birth_order ? `Con thứ ${selectedNode.birth_order}` : null],
-                  ['Ngày sinh', [selectedNode.birth_day, selectedNode.birth_month, selectedNode.birth_year].filter(Boolean).join('/') || null],
-                  ['Ngày sinh âm lịch', selectedNode.birth_date_lunar || null],
-                  ['Ngày mất', !selectedNode.isAlive && [selectedNode.death_day, selectedNode.death_month, selectedNode.death_year].filter(Boolean).join('/') || null],
-                  ['Ngày mất âm lịch', !selectedNode.isAlive ? (selectedNode.death_date_lunar || null) : null],
-                  ['Nghề nghiệp', selectedNode.occupation || null],
-                  ['Nơi ở', selectedNode.current_residence || null],
-                ].filter(([, v]) => v != null).map(([label, value]) => (
-                  <div key={label} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 0.8fr) 1.2fr', gap: 12, alignItems: 'baseline', padding: '9px 0', borderBottom: '1px solid var(--color-border)' }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--color-text-primary)', fontWeight: 600 }}>{value}</div>
-                  </div>
-                ))}
+              <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 18, alignItems: 'start' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
 
-                {selectedNode.biography && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Tiểu sử</div>
-                    <div style={{ fontSize: '0.825rem', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>{selectedNode.biography}</div>
-                  </div>
-                )}
+                  {/* Hậu duệ: tóm tắt số con / dâu-rể / cháu */}
+                  {descendantStats && descendantStats.totalChildren > 0 && (
+                    <div>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Hậu duệ</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                        <div style={{ background: 'var(--color-surface-alt)', borderRadius: 10, padding: '10px 12px' }}>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: 2 }}>Con ruột</div>
+                          <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>{descendantStats.totalChildren}</div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                            ♂ {descendantStats.sonCount}&nbsp;&nbsp;♀ {descendantStats.daughterCount}
+                          </div>
+                        </div>
+                        <div style={{ background: 'var(--color-surface-alt)', borderRadius: 10, padding: '10px 12px' }}>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: 2 }}>Dâu / Rể</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--color-text-primary)', fontWeight: 600 }}>Con dâu {descendantStats.daughtersInLaw}</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--color-text-primary)', fontWeight: 600 }}>Con rể {descendantStats.sonsInLaw}</div>
+                        </div>
+                        <div style={{ background: 'var(--color-surface-alt)', borderRadius: 10, padding: '10px 12px' }}>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: 2 }}>Cháu</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--color-text-primary)', fontWeight: 600 }}>Cháu nội {descendantStats.paternalGrandchildren}</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--color-text-primary)', fontWeight: 600 }}>Cháu ngoại {descendantStats.maternalGrandchildren}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-                <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--color-border)' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Cha mẹ</div>
-                  {selectedParents.length === 0 && <div style={{ fontSize: '.82rem', color: 'var(--color-text-muted)' }}>Chưa cập nhật</div>}
-                  {selectedParents.map(relation => <div key={relation.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}><button onClick={() => setSelectedNode(nodeById.get(relation.person_a) || null)} style={{ border: 0, background: 'none', padding: 0, color: 'var(--color-primary)', cursor: 'pointer' }}>{nodeById.get(relation.person_a)?.full_name || 'Không rõ'}</button>{hasPermission('relationship.manage') && <button className="btn btn-ghost btn-sm" disabled={relationSaving} onClick={() => handleRelationDelete(relation)}>Xóa</button>}</div>)}
-                </div>
-
-                {selectedSpouses.length > 0 && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Vợ/Chồng</div>
-                    {selectedSpouses.map(relation => {
-                      const spouseId = relation.person_a === selectedNode.id ? relation.person_b : relation.person_a;
-                      return <div key={relation.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' }}><button onClick={() => setSelectedNode(nodeById.get(spouseId) || null)} style={{ border: 0, background: 'none', padding: 0, color: 'var(--color-primary)', cursor: 'pointer' }}>{nodeById.get(spouseId)?.full_name || 'Không rõ'}</button>{hasPermission('relationship.manage') && <button className="btn btn-ghost btn-sm" disabled={relationSaving} onClick={() => handleRelationDelete(relation)}>Xóa</button>}</div>;
-                    })}
-                  </div>
-                )}
-
-                {selectedNode.children?.length > 0 && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Con cái ({selectedNode.children.length})</div>
-                    {selectedChildren.map(relation => (
-                      <div key={relation.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><button onClick={() => setSelectedNode(nodeById.get(relation.person_b) || null)} style={{ display: 'block', textAlign: 'left', background: 'none', border: 0, fontSize: '0.825rem', color: 'var(--color-primary)', padding: '3px 0', cursor: 'pointer' }}>{nodeById.get(relation.person_b)?.full_name || 'Không rõ'}</button>{hasPermission('relationship.manage') && <button className="btn btn-ghost btn-sm" disabled={relationSaving} onClick={() => handleRelationDelete(relation)}>Xóa</button>}</div>
+                  {/* Thông tin cơ bản khác */}
+                  <div>
+                    {[
+                      ['Giới tính', selectedNode.gender === 'male' ? 'Nam' : selectedNode.gender === 'female' ? 'Nữ' : 'Khác'],
+                      ['Tên húy', selectedNode.taboo_name || null],
+                      ['Tên tự / tên khác', selectedNode.courtesy_name || null],
+                      ['Tên khác', selectedNode.other_names || null],
+                      ['Thứ tự sinh', selectedNode.birth_order ? `Con thứ ${selectedNode.birth_order}` : null],
+                      ['Ngày sinh âm lịch', selectedNode.birth_date_lunar || null],
+                      ['Ngày mất âm lịch', !selectedNode.isAlive ? (selectedNode.death_date_lunar || null) : null],
+                    ].filter(([, v]) => v != null).map(([label, value]) => (
+                      <div key={label} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 0.8fr) 1.2fr', gap: 12, alignItems: 'baseline', padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+                        <div style={{ fontSize: '0.875rem', color: 'var(--color-text-primary)', fontWeight: 600 }}>{value}</div>
+                      </div>
                     ))}
                   </div>
-                )}
 
-                {hasPermission('relationship.manage') && <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-border)' }}>
-                  <div style={{ fontSize: '.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Thêm quan hệ</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr auto', gap: 6 }}>
-                    <select className="input" value={relationForm.type} onChange={event => setRelationForm({ type: event.target.value, targetId: '' })}>
-                      <option value="parent">Cha/mẹ</option><option value="adopted_child">Con nuôi</option><option value="child">Con</option><option value="spouse">Vợ/chồng</option>
-                    </select>
-                    <select className="input" value={relationForm.targetId} onChange={event => setRelationForm({ ...relationForm, targetId: event.target.value })}>
-                      <option value="">Chọn thành viên</option>{layout.nodes.filter(node => node.id !== selectedNode.id).map(node => <option key={node.id} value={node.id}>{node.full_name}</option>)}
-                    </select>
-                    <button className="btn btn-primary btn-sm" disabled={!relationForm.targetId || relationSaving} onClick={handleRelationSave}>Lưu</button>
+                  {/* Ghi chú */}
+                  <div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Ghi chú</div>
+                    <div style={{ background: 'var(--color-surface-alt)', borderRadius: 10, padding: '10px 12px', fontSize: '0.85rem', color: selectedNode.note || selectedNode.biography ? 'var(--color-text-primary)' : 'var(--color-text-muted)', fontStyle: selectedNode.note || selectedNode.biography ? 'normal' : 'italic', lineHeight: 1.5 }}>
+                      {selectedNode.note || selectedNode.biography || 'Chưa có ghi chú.'}
+                    </div>
                   </div>
-                </div>}
+
+                  {/* Gia đình: cha mẹ / vợ chồng / con cái, mỗi mục có avatar */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Gia đình</div>
+
+                    <div>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 6 }}>Bố / Mẹ</div>
+                      {selectedParents.length === 0 && <div style={{ fontSize: '.82rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Chưa có thông tin.</div>}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {selectedParents.map(relation => {
+                          const parent = nodeById.get(String(relation.person_a)) || nodeById.get(relation.person_a);
+                          return (
+                            <div key={relation.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0', transition: 'transform 150ms ease' }}
+                              className="gp-relation-row">
+                              <button onClick={() => setSelectedNode(parent || null)} style={{ display: 'flex', alignItems: 'center', gap: 10, border: 0, background: 'none', padding: 0, cursor: 'pointer', flex: 1, minWidth: 0, textAlign: 'left' }}>
+                                <PersonAvatar person={parent} size={32} />
+                                <span style={{ color: 'var(--color-text-primary)', fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{parent?.full_name || 'Không rõ'}</span>
+                              </button>
+                              {hasPermission('relationship.manage') && <button className="btn btn-ghost btn-sm" disabled={relationSaving} onClick={() => handleRelationDelete(relation)}>Xóa</button>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 6 }}>Vợ / Chồng</div>
+                      {selectedSpouses.length === 0 && <div style={{ fontSize: '.82rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Chưa có thông tin.</div>}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {selectedSpouses.map(relation => {
+                          const spouseId = relation.person_a === selectedNode.id ? relation.person_b : relation.person_a;
+                          const spouse = nodeById.get(String(spouseId)) || nodeById.get(spouseId);
+                          return (
+                            <div key={relation.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }} className="gp-relation-row">
+                              <button onClick={() => setSelectedNode(spouse || null)} style={{ display: 'flex', alignItems: 'center', gap: 10, border: 0, background: 'none', padding: 0, cursor: 'pointer', flex: 1, minWidth: 0, textAlign: 'left' }}>
+                                <PersonAvatar person={spouse} size={32} />
+                                <span style={{ color: 'var(--color-text-primary)', fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{spouse?.full_name || 'Không rõ'}</span>
+                              </button>
+                              {hasPermission('relationship.manage') && <button className="btn btn-ghost btn-sm" disabled={relationSaving} onClick={() => handleRelationDelete(relation)}>Xóa</button>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {selectedChildren.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 6 }}>Con cái ({selectedChildren.length})</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {selectedChildren.map(relation => {
+                            const child = nodeById.get(String(relation.person_b)) || nodeById.get(relation.person_b);
+                            return (
+                              <div key={relation.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }} className="gp-relation-row">
+                                <button onClick={() => setSelectedNode(child || null)} style={{ display: 'flex', alignItems: 'center', gap: 10, border: 0, background: 'none', padding: 0, cursor: 'pointer', flex: 1, minWidth: 0, textAlign: 'left' }}>
+                                  <PersonAvatar person={child} size={32} />
+                                  <span style={{ color: 'var(--color-text-primary)', fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{child?.full_name || 'Không rõ'}</span>
+                                </button>
+                                {hasPermission('relationship.manage') && <button className="btn btn-ghost btn-sm" disabled={relationSaving} onClick={() => handleRelationDelete(relation)}>Xóa</button>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {hasPermission('relationship.manage') && (
+                    <div style={{ paddingTop: 14, borderTop: '1px solid var(--color-border)' }}>
+                      <div style={{ fontSize: '.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Thêm quan hệ</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr auto', gap: 8 }}>
+                        <select className="input" value={relationForm.type} onChange={event => setRelationForm({ type: event.target.value, targetId: '' })}>
+                          <option value="parent">Cha/mẹ</option><option value="adopted_child">Con nuôi</option><option value="child">Con</option><option value="spouse">Vợ/chồng</option>
+                        </select>
+                        <select className="input" value={relationForm.targetId} onChange={event => setRelationForm({ ...relationForm, targetId: event.target.value })}>
+                          <option value="">Chọn thành viên</option>{layout.nodes.filter(node => node.id !== selectedNode.id).map(node => <option key={node.id} value={node.id}>{node.full_name}</option>)}
+                        </select>
+                        <button className="btn btn-primary btn-sm" disabled={!relationForm.targetId || relationSaving} onClick={handleRelationSave}>Lưu</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Cột phải: Thông tin liên hệ */}
+                <div style={{ background: 'var(--color-surface-alt)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>Thông tin liên hệ</div>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: 4 }}>Số điện thoại</div>
+                    <div style={{ fontSize: '0.85rem', color: selectedNode.phone_number ? 'var(--color-text-primary)' : 'var(--color-text-muted)', fontStyle: selectedNode.phone_number ? 'normal' : 'italic' }}>{selectedNode.phone_number || 'Chưa cập nhật'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: 4 }}>Nghề nghiệp</div>
+                    <div style={{ fontSize: '0.85rem', color: selectedNode.occupation ? 'var(--color-text-primary)' : 'var(--color-text-muted)', fontStyle: selectedNode.occupation ? 'normal' : 'italic' }}>{selectedNode.occupation || 'Chưa cập nhật'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: 4 }}>Nơi ở hiện tại</div>
+                    <div style={{ fontSize: '0.85rem', color: selectedNode.current_residence ? 'var(--color-text-primary)' : 'var(--color-text-muted)', fontStyle: selectedNode.current_residence ? 'normal' : 'italic' }}>{selectedNode.current_residence || 'Chưa cập nhật'}</div>
+                  </div>
+                </div>
               </div>
 
-              <div style={{ padding: '12px 14px', borderTop: '1px solid var(--color-border)', display: 'flex', gap: 8 }}>
+              <div style={{ padding: '12px 20px', borderTop: '1px solid var(--color-border)', display: 'flex', gap: 8 }}>
                 <button className="btn btn-secondary btn-sm" style={{ flex: 1 }}
-                  onClick={() => { setEditingMember(selectedNode); setModalOpen(true); }}>
+                  onClick={() => { returnToDetailIdRef.current = selectedNode.id; setEditingMember(selectedNode); setModalOpen(true); setSelectedNode(null); }}>
                   Sửa
                 </button>
                 <button className="btn btn-sm" style={{ flex: 1, background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}
@@ -1180,7 +1438,7 @@ export default function FamilyTree() {
 
       <MemberFormModal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={handleModalClose}
         onSave={handleSave}
         members={treeData.members}
         editingMember={editingMember}
