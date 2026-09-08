@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import memberService from '../services/memberService';
 import { useFamilyTree } from '../contexts/FamilyTreeContext';
 import { MemberFormModal } from './FamilyTree';
+import { exportMembersToExcel } from '../utils/excelUtils';
 
 const IconSearch = () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -76,9 +77,7 @@ export default function Members() {
     };
 
     const exportExcel = () => {
-        const rows = [['Họ và tên', 'Giới tính', 'Đời', 'Năm sinh', 'Năm mất', 'Nghề nghiệp', 'Nơi ở', 'Trạng thái'], ...filteredMembers.map(member => [member.fullName, member.gender === 0 ? 'Nam' : member.gender === 1 ? 'Nữ' : 'Khác', member.generationLevel || '', member.birthYear || '', member.deathYear || '', member.occupation || '', member.currentResidence || '', member.isAlive ? 'Còn sống' : 'Đã mất'])];
-        const csv = '\ufeff' + rows.map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\r\n');
-        const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); link.download = 'danh-sach-thanh-vien.xls'; link.click(); URL.revokeObjectURL(link.href);
+        exportMembersToExcel(filteredMembers, currentTree?.name || 'Gia Phả');
     };
 
     return (
@@ -86,7 +85,7 @@ export default function Members() {
             <Navbar />
 
             <main className="page-content">
-                <div className="content-header-row"><div className="section-header"><h1 className="section-title">Danh sách thành viên</h1><p className="section-sub">Tra cứu và quản lý hồ sơ trong dòng họ hiện tại.</p></div><div className="content-header-actions"><button className="btn btn-secondary btn-sm" onClick={loadMembers}><IconRefresh /> Làm mới</button><button className="btn btn-primary btn-sm" disabled={!hasPermission('member_list.create')} onClick={() => setModalOpen(true)}><IconPlus /> Thêm thành viên</button><button className="btn btn-secondary btn-sm" disabled={!hasPermission('tree_view.export')} onClick={exportExcel}>Xuất Excel</button></div></div>
+                <div className="content-header-row"><div className="section-header"><h1 className="section-title">Danh sách thành viên</h1><p className="section-sub">Tra cứu và quản lý hồ sơ trong dòng họ hiện tại.</p></div><div className="content-header-actions"><button className="btn btn-secondary btn-sm" onClick={loadMembers}><IconRefresh /> Làm mới</button><button className="btn btn-primary btn-sm" disabled={!hasPermission('member_list.create')} onClick={() => setModalOpen(true)}><IconPlus /> Thêm thành viên</button><button className="btn btn-secondary btn-sm" disabled={!hasPermission('tree_view.export')} onClick={exportExcel}>Xuất Excel</button><button className="btn btn-secondary btn-sm" disabled={!hasPermission('tree_view.export')} onClick={() => navigate('/import-export')}>Nhập / Xuất Excel</button></div></div>
 
                 <div className="card" style={{ padding: 16, marginBottom: 20 }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) repeat(3, minmax(130px, 180px))', gap: 10 }}>
