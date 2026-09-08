@@ -771,6 +771,7 @@ a {
   color: var(--color-text-secondary);
   font: 600 .86rem var(--font-sans);
   text-align: left;
+  line-height: 1.2;
   cursor: pointer;
   transition: color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
 }
@@ -810,6 +811,7 @@ a {
   width: 20px;
   height: 20px;
   flex: 0 0 20px;
+  display: block;
 }
 
 .sidebar-collapsed .sidebar-item {
@@ -822,6 +824,10 @@ a {
 
 .sidebar-collapsed .sidebar-heading {
   justify-content: center;
+  padding-inline: 0;
+}
+
+.sidebar-collapsed .sidebar-switch {
   padding-inline: 0;
 }
 
@@ -927,6 +933,63 @@ a {
   color: var(--color-primary);
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
+}
+
+.profile-tabs {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  margin-bottom: 20px;
+  padding: 4px;
+  overflow-x: auto;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.profile-tab {
+  flex: 1 0 180px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: .9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.profile-tab:hover {
+  color: var(--color-primary);
+  background: rgba(255, 255, 255, .72);
+}
+
+.profile-tab-active {
+  color: var(--color-primary);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.profile-tab-panel {
+  min-width: 0;
+}
+
+.profile-card {
+  padding: 24px;
+}
+
+@media (max-width: 640px) {
+  .profile-card {
+    padding: 18px;
+  }
+
+  .profile-tab {
+    flex-basis: 160px;
+    padding-inline: 12px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1136,8 +1199,8 @@ a {
 }
 
 .feature-icon {
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   border-radius: var(--radius-md);
   background: var(--color-primary-bg);
   display: flex;
@@ -1147,8 +1210,8 @@ a {
 }
 
 .feature-icon svg {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   color: var(--color-primary);
 }
 
@@ -1169,10 +1232,11 @@ a {
 }
 
 .feature-title {
+  font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.0625rem;
+  font-size: 1.15rem;
   color: var(--color-text-primary);
-  margin-bottom: var(--space-2);
+  margin-bottom: 10px;
 }
 
 .feature-desc {
@@ -1231,6 +1295,77 @@ a {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.family-tree-titlebar {
+  margin: 0;
+  padding: 22px var(--space-6) 18px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.family-tree-workspace {
+  position: relative;
+  min-height: 0;
+  margin: 16px var(--space-6) var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.family-tree-sidebar,
+.family-tree-detail,
+.family-tree-canvas {
+  min-height: 0;
+}
+
+.family-tree-sidebar {
+  flex: 0 0 auto;
+}
+
+.family-tree-detail {
+  flex: 0 0 260px;
+}
+
+.family-tree-toggle {
+  transform: translateX(-50%);
+}
+
+@media (max-width: 768px) {
+  .family-tree-titlebar {
+    padding: 18px var(--space-4) 14px;
+  }
+
+  .family-tree-workspace {
+    margin: 12px var(--space-4) var(--space-4);
+  }
+
+  .family-tree-sidebar {
+    width: min(280px, 82vw) !important;
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 3;
+    box-shadow: 8px 0 24px rgba(28, 25, 23, .14);
+  }
+
+  .family-tree-sidebar[style*="width: 0"] {
+    pointer-events: none;
+  }
+
+  .family-tree-detail {
+    position: absolute;
+    inset: 0 0 0 auto;
+    z-index: 3;
+    width: min(280px, 82vw) !important;
+    box-shadow: -8px 0 24px rgba(28, 25, 23, .14);
+  }
+
+  .family-tree-toggle {
+    left: 12px !important;
+    top: 12px !important;
+    transform: none;
+  }
 }
 
 /* ==================== GRID ==================== */

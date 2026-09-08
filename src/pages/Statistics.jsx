@@ -2,9 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import memberService from '../services/memberService';
+import { formatLunarDate } from '../utils/lunarCalendar';
 
 const IconBack = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>;
 const IconRefresh = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>;
+const IconDownload = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12" /><polyline points="7 10 12 15 17 10" /><path d="M5 21h14" /></svg>;
 
 function StatCard({ label, value, detail, color }) {
     return <div className="card" style={{ padding: 20, borderTop: `3px solid ${color}` }}><div style={{ color: 'var(--color-text-muted)', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase' }}>{label}</div><div style={{ color: 'var(--color-text-primary)', fontSize: '2rem', fontWeight: 800, margin: '8px 0 2px' }}>{value}</div><div style={{ color: 'var(--color-text-muted)', fontSize: '0.82rem' }}>{detail}</div></div>;
@@ -34,9 +36,30 @@ export default function Statistics() {
         return { male: members.filter(member => member.gender === 0).length, female: members.filter(member => member.gender === 1).length, alive: members.filter(member => member.isAlive).length, deceased: members.filter(member => !member.isAlive).length, generations: Object.entries(generations).sort((a, b) => Number(a[0]) - Number(b[0])), years: Object.entries(years).sort((a, b) => b[1] - a[1]).slice(0, 8), ages, zodiac };
     }, [members]);
     const maxGeneration = Math.max(...summary.generations.map(([, count]) => count), 1);
+    const exportExcel = () => {
+        const escapeHtml = value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+        const table = (title, headers, rows) => `<h2>${escapeHtml(title)}</h2><table><thead><tr>${headers.map(header => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+        const gender = value => value === 0 ? 'Nam' : value === 1 ? 'Nữ' : 'Khác';
+        const report = [
+            table('Tổng quan dòng họ', ['Chỉ số', 'Giá trị'], [
+                ['Tổng thành viên', members.length], ['Nam', summary.male], ['Nữ', summary.female], ['Còn sống', summary.alive], ['Đã mất', summary.deceased], ['Số thế hệ', summary.generations.length]
+            ]),
+            table('Phân bố độ tuổi', ['Nhóm tuổi', 'Nam', 'Nữ'], summary.ages),
+            table('Phân bố theo đời', ['Đời', 'Số thành viên'], summary.generations.map(([generation, count]) => [`Đời ${generation}`, count])),
+            table('Năm sinh phổ biến', ['Năm sinh', 'Số thành viên'], summary.years),
+            table('Con giáp', ['Con giáp', 'Số thành viên'], summary.zodiac),
+            table('Danh sách thành viên', ['Họ và tên', 'Giới tính', 'Đời', 'Năm sinh', 'Năm mất', 'Trạng thái'], members.map(member => [member.fullName, gender(member.gender), member.generationLevel || '', member.birthYear || '', member.deathYear || '', member.isAlive ? 'Còn sống' : 'Đã mất']))
+        ].join('');
+        const html = `<html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif}h1{color:#b5451b}h2{margin-top:22px;color:#3b6978}table{border-collapse:collapse;margin-bottom:18px;min-width:420px}th,td{border:1px solid #d8d0c5;padding:7px 10px;text-align:left}th{background:#f5f1ea;font-weight:bold}</style></head><body><h1>Thống kê dòng họ</h1><p>Ngày xuất: ${escapeHtml(new Date().toLocaleDateString('vi-VN'))} · Âm lịch: ${escapeHtml(formatLunarDate(new Date()))}</p>${report}</body></html>`;
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(new Blob([`\ufeff${html}`], { type: 'application/vnd.ms-excel;charset=utf-8' }));
+        link.download = 'thong-ke-dong-ho.xls';
+        link.click();
+        URL.revokeObjectURL(link.href);
+    };
 
     return <div className="page"><Navbar /><main className="page-content">
-        <div className="content-header-row"><div className="section-header"><h1 className="section-title">Thống kê dòng họ</h1><p className="section-sub">Tổng quan nhân khẩu và phân bố thành viên trong cây gia phả.</p></div><div className="content-header-actions"><button className="btn btn-secondary btn-sm" onClick={load}><IconRefresh /> Làm mới</button></div></div>
+        <div className="content-header-row"><div className="section-header"><h1 className="section-title">Thống kê dòng họ</h1><p className="section-sub">Tổng quan nhân khẩu và phân bố thành viên trong cây gia phả.</p></div><div className="content-header-actions"><button className="btn btn-secondary btn-sm" onClick={load}><IconRefresh /> Làm mới</button><button className="btn btn-secondary btn-sm" disabled={loading} onClick={exportExcel}><IconDownload /> Xuất Excel</button></div></div>
         {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
         {loading ? <div style={{ textAlign: 'center', padding: 50, color: 'var(--color-text-muted)' }}>Đang tổng hợp dữ liệu...</div> : <>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(140px, 1fr))', gap: 16, marginBottom: 24 }}>
