@@ -20,6 +20,8 @@ import Events from './pages/Events';
 import Kinship from './pages/Kinship';
 import Gallery from './pages/Gallery';
 import Membership from './pages/Membership';
+import Users from './pages/Users';
+import ImportExport from './pages/ImportExport';
 
 function App() {
   return (
@@ -100,6 +102,8 @@ function App() {
             <Route path="/kinship" element={<ProtectedRoute requiresTree={true} requiredPermission="kinship.view"><Kinship /></ProtectedRoute>} />
             <Route path="/gallery" element={<ProtectedRoute requiresTree={true} requiredPermission="gallery.view"><Gallery /></ProtectedRoute>} />
             <Route path="/membership" element={<ProtectedRoute requiresTree={true} requiredPermission="membership.view"><Membership /></ProtectedRoute>} />
+            <Route path="/users" element={<ProtectedRoute requiresTree={true} requiredPermission="user.view"><Users /></ProtectedRoute>} />
+            <Route path="/import-export" element={<ProtectedRoute requiresTree={true} requiredPermission="tree_view.export"><ImportExport /></ProtectedRoute>} />
             <Route
               path="/select-tree"
               element={

@@ -34,6 +34,17 @@ const IconX = () => (
     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
   </svg>
 );
+const IconLink = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+  </svg>
+);
+const IconCheck = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+);
 const IconFamily = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -57,6 +68,11 @@ export default function SelectTree() {
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [createLoading, setCreateLoading] = useState(false);
+  const [openJoinModal, setOpenJoinModal] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [joinSuccess, setJoinSuccess] = useState("");
+  const [joinError, setJoinError] = useState("");
   const { selectTree, clearSelectedTree } = useFamilyTree();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -100,6 +116,28 @@ export default function SelectTree() {
       setError("Không thể tạo gia phả mới.");
     } finally {
       setCreateLoading(false);
+    }
+  };
+
+  const handleJoin = async (e) => {
+    e.preventDefault();
+    if (!joinCode.trim()) return;
+    setJoinLoading(true);
+    setJoinError(""); setJoinSuccess("");
+    try {
+      const result = await familyTreeService.joinTree(joinCode);
+      if (result.status === "Pending" || result.message) {
+        setJoinSuccess(result.message || "Yêu cầu tham gia đã được gửi. Chờ quản trị viên duyệt.");
+        setJoinCode("");
+      } else {
+        setOpenJoinModal(false);
+        setJoinCode(""); setJoinSuccess("");
+        fetchTrees();
+      }
+    } catch (err) {
+      setJoinError(err.response?.data?.message || "Mã tham gia không hợp lệ hoặc đã xảy ra lỗi.");
+    } finally {
+      setJoinLoading(false);
     }
   };
 
@@ -177,6 +215,20 @@ export default function SelectTree() {
                   <div className="tree-icon" aria-hidden="true"><IconFamily /></div>
                   <div className="tree-info">
                     <div className="tree-name">{tree.name}</div>
+                    {tree.description && (
+                      <div style={{
+                        fontSize: "0.8125rem",
+                        color: "var(--color-text-secondary)",
+                        marginTop: "3px",
+                        lineHeight: 1.5,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden"
+                      }}>
+                        {tree.description}
+                      </div>
+                    )}
                     <div className="tree-meta">
                       <span className={roleChipClass(tree.role)}>{tree.role}</span>
                     </div>
@@ -186,16 +238,27 @@ export default function SelectTree() {
               ))}
             </div>
 
-            {/* Create new */}
-            <button
-              className="btn btn-secondary btn-full"
-              style={{ height: "52px", justifyContent: "center", borderStyle: "dashed" }}
-              onClick={() => setOpenModal(true)}
-              id="btn-create-tree"
-              aria-haspopup="dialog"
-            >
-              <IconPlus /> Tao gia pha moi
-            </button>
+            {/* Create new + Join buttons */}
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                className="btn btn-secondary btn-full"
+                style={{ height: "52px", justifyContent: "center", borderStyle: "dashed" }}
+                onClick={() => setOpenModal(true)}
+                id="btn-create-tree"
+                aria-haspopup="dialog"
+              >
+                <IconPlus /> Tao gia pha moi
+              </button>
+              <button
+                className="btn btn-secondary btn-full"
+                style={{ height: "52px", justifyContent: "center", borderStyle: "dashed", color: "var(--color-primary)", borderColor: "var(--color-primary)" }}
+                onClick={() => { setOpenJoinModal(true); setJoinSuccess(""); setJoinError(""); setJoinCode(""); }}
+                id="btn-join-tree"
+                aria-haspopup="dialog"
+              >
+                <IconLink /> Tham gia gia phả
+              </button>
+            </div>
 
             {trees.length === 0 && (
               <p style={{ textAlign: "center", color: "var(--color-text-muted)", fontSize: "0.9375rem", marginTop: "24px" }}>
@@ -238,6 +301,67 @@ export default function SelectTree() {
                 <button type="submit" className="btn btn-primary" disabled={createLoading || !newName.trim()} id="btn-confirm-create">
                   {createLoading ? <span className="spinner" /> : "Tao gia pha"}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {openJoinModal && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="join-modal-title"
+          onClick={(e) => e.target === e.currentTarget && setOpenJoinModal(false)}>
+          <div className="modal">
+            <div className="modal-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <h2 className="modal-title" id="join-modal-title">Tham gia gia phả</h2>
+              <button className="btn btn-ghost btn-sm" onClick={() => setOpenJoinModal(false)} aria-label="Dong hop thoai" style={{ padding: "8px" }}>
+                <IconX />
+              </button>
+            </div>
+            <form onSubmit={handleJoin}>
+              <div className="modal-body">
+                <p style={{ fontSize: "0.9rem", color: "var(--color-text-secondary)", marginBottom: "20px", lineHeight: 1.6 }}>
+                  Nhập mã tham gia 6 ký tự được quản trị viên chia sẻ để vào gia phả.
+                </p>
+
+                {joinError && (
+                  <div className="alert alert-error" role="alert" style={{ marginBottom: "16px" }}>
+                    <IconAlert /><span>{joinError}</span>
+                  </div>
+                )}
+
+                {joinSuccess && (
+                  <div className="alert alert-success" role="alert" style={{ marginBottom: "16px", background: "#f0fdf4", borderColor: "#86efac", color: "#166534" }}>
+                    <IconCheck /><span>{joinSuccess}</span>
+                  </div>
+                )}
+
+                {!joinSuccess && (
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" htmlFor="join-code-input">Mã tham gia *</label>
+                    <input
+                      id="join-code-input"
+                      type="text"
+                      className="form-input"
+                      style={{ paddingLeft: "16px", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 600, fontSize: "1.1rem" }}
+                      placeholder="VD: A1B2C3"
+                      value={joinCode}
+                      onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                      maxLength={6}
+                      autoFocus
+                      required
+                    />
+                    <p style={{ fontSize: "0.78rem", color: "var(--color-text-muted)", marginTop: "6px" }}>
+                      Mã gồm 6 ký tự, không phân biệt chữ hoa/thường.
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setOpenJoinModal(false)}>Huy</button>
+                {!joinSuccess && (
+                  <button type="submit" className="btn btn-primary" disabled={joinLoading || joinCode.trim().length < 6} id="btn-confirm-join">
+                    {joinLoading ? <span className="spinner" /> : "Tham gia"}
+                  </button>
+                )}
               </div>
             </form>
           </div>

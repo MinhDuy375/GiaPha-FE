@@ -1,4 +1,4 @@
-﻿import api from './api';
+import api from './api';
 
 const familyTreeService = {
   getMyTrees: async () => {
@@ -13,11 +13,6 @@ const familyTreeService = {
 
   joinTree: async (joinCode) => {
     const response = await api.post('/familytree/join', { joinCode: joinCode.trim().toUpperCase() });
-    return response.data;
-  },
-
-  getMyJoinRequests: async () => {
-    const response = await api.get('/familytree/my-join-requests');
     return response.data;
   }
 };
