@@ -6,12 +6,21 @@ import Navbar from '../components/Navbar';
 import { computeTreeLayout, filterTreeData, GENDER_COLORS, NODE_WIDTH, NODE_HEIGHT, AVATAR_RADIUS, RING_GAP } from '../utils/treeLayout';
 import { API_ORIGIN } from '../services/api';
 import { useFamilyTree } from '../contexts/FamilyTreeContext';
-import membershipService from '../services/membershipService';
-import relationshipService from '../services/relationshipService';
 
 const IconPlus = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+const IconBack = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 18 9 12 15 6" />
+  </svg>
+);
+const IconRefresh = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
+    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
   </svg>
 );
 const IconSearch = () => (
@@ -96,23 +105,6 @@ export function MemberFormModal({ open, onClose, onSave, members, editingMember 
 
   const update = (field, value) => setForm(f => ({ ...f, [field]: value }));
 
-  useEffect(() => {
-    if (!open || editingMember) return;
-    const parentIds = [form.fatherId, form.motherId].filter(Boolean);
-    const parents = members.filter(member => parentIds.includes(String(member.id)));
-    const spouse = members.find(member => String(member.id) === String(form.spouseId));
-    const parentGeneration = parents.length > 0
-      ? Math.max(...parents.map(member => Number(member.generation ?? member.generationLevel ?? 1))) + 1
-      : null;
-    const relatedGeneration = spouse
-      ? Number(spouse.generation ?? spouse.generationLevel ?? 1)
-      : null;
-    const inferredGeneration = parentGeneration ?? relatedGeneration;
-    if (inferredGeneration && inferredGeneration !== Number(form.generationLevel)) {
-      setForm(current => ({ ...current, generationLevel: inferredGeneration }));
-    }
-  }, [open, editingMember, form.fatherId, form.motherId, form.spouseId, members]);
-
   const handleSave = async () => {
     const birthYear = form.birthYear === '' ? null : Number(form.birthYear);
     const deathYear = form.deathYear === '' ? null : Number(form.deathYear);
@@ -188,6 +180,12 @@ export function MemberFormModal({ open, onClose, onSave, members, editingMember 
     update(field === 'birth' ? 'birthYear' : 'deathYear', year);
     update(field === 'birth' ? 'birthMonth' : 'deathMonth', month);
     update(field === 'birth' ? 'birthDay' : 'deathDay', day);
+    const lunar = value ? solarToLunar(`${value}T00:00:00`) : null;
+    const prefix = field === 'birth' ? 'birth' : 'death';
+    update(`${prefix}DateLunar`, lunar ? `${lunar.day}/${lunar.month}/${lunar.year}${lunar.leap ? ' (nhuận)' : ''}` : '');
+    update(`${prefix}LunarDay`, lunar?.day || '');
+    update(`${prefix}LunarMonth`, lunar?.month || '');
+    update(`${prefix}LunarYear`, lunar?.year || '');
   };
 
   const inputStyle = {
@@ -251,9 +249,9 @@ export function MemberFormModal({ open, onClose, onSave, members, editingMember 
             <div>
               <label style={labelStyle}>Ngày sinh âm lịch</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.4fr', gap: 6 }}>
-                <input style={inputStyle} type="number" min={1} max={30} value={form.birthLunarDay} onChange={e => update('birthLunarDay', e.target.value)} placeholder="Ngày" />
-                <input style={inputStyle} type="number" min={1} max={12} value={form.birthLunarMonth} onChange={e => update('birthLunarMonth', e.target.value)} placeholder="Tháng" />
-                <input style={inputStyle} type="number" min={1} max={2100} value={form.birthLunarYear} onChange={e => update('birthLunarYear', e.target.value)} placeholder="Năm" />
+                <input style={{ ...inputStyle, background: 'var(--color-surface-alt)' }} type="number" value={form.birthLunarDay} readOnly placeholder="Ngày" />
+                <input style={{ ...inputStyle, background: 'var(--color-surface-alt)' }} type="number" value={form.birthLunarMonth} readOnly placeholder="Tháng" />
+                <input style={{ ...inputStyle, background: 'var(--color-surface-alt)' }} type="number" value={form.birthLunarYear} readOnly placeholder="Năm" />
               </div>
             </div>
           </div>
@@ -268,9 +266,9 @@ export function MemberFormModal({ open, onClose, onSave, members, editingMember 
             <div>
               <label style={labelStyle}>Ngày mất âm lịch</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.4fr', gap: 6 }}>
-                <input style={inputStyle} type="number" min={1} max={30} value={form.deathLunarDay} onChange={e => update('deathLunarDay', e.target.value)} placeholder="Ngày" />
-                <input style={inputStyle} type="number" min={1} max={12} value={form.deathLunarMonth} onChange={e => update('deathLunarMonth', e.target.value)} placeholder="Tháng" />
-                <input style={inputStyle} type="number" min={1} max={2100} value={form.deathLunarYear} onChange={e => update('deathLunarYear', e.target.value)} placeholder="Năm" />
+                <input style={{ ...inputStyle, background: 'var(--color-surface-alt)' }} type="number" value={form.deathLunarDay} readOnly placeholder="Ngày" />
+                <input style={{ ...inputStyle, background: 'var(--color-surface-alt)' }} type="number" value={form.deathLunarMonth} readOnly placeholder="Tháng" />
+                <input style={{ ...inputStyle, background: 'var(--color-surface-alt)' }} type="number" value={form.deathLunarYear} readOnly placeholder="Năm" />
               </div>
             </div>
           </div>}
@@ -307,7 +305,7 @@ export function MemberFormModal({ open, onClose, onSave, members, editingMember 
                 <label style={labelStyle}>Cha</label>
                 <select style={inputStyle} value={form.fatherId} onChange={e => update('fatherId', e.target.value)}>
                   <option value="">-- Chọn cha --</option>
-                  {members.filter(m => m.gender !== 'female' && m.gender !== 1 && m.gender !== '1').map(m => (
+                  {members.filter(m => m.gender !== 'female').map(m => (
                     <option key={m.id} value={m.id}>{m.full_name}</option>
                   ))}
                 </select>
@@ -316,7 +314,7 @@ export function MemberFormModal({ open, onClose, onSave, members, editingMember 
                 <label style={labelStyle}>Mẹ</label>
                 <select style={inputStyle} value={form.motherId} onChange={e => update('motherId', e.target.value)}>
                   <option value="">-- Chọn mẹ --</option>
-                  {members.filter(m => m.gender === 'female' || m.gender === 1 || m.gender === '1').map(m => (
+                  {members.filter(m => m.gender === 'female').map(m => (
                     <option key={m.id} value={m.id}>{m.full_name}</option>
                   ))}
                 </select>
@@ -557,8 +555,6 @@ export default function FamilyTree() {
   const [error, setError] = useState('');
   const [selectedNode, setSelectedNode] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [relationForm, setRelationForm] = useState({ type: 'parent', targetId: '' });
-  const [relationSaving, setRelationSaving] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   // Nếu mở popup Sửa từ popup Chi tiết, lưu lại id thành viên đó để khi đóng/hủy popup Sửa
   // thì tự động mở lại popup Chi tiết (thay vì đóng luôn cả 2).
@@ -567,16 +563,13 @@ export default function FamilyTree() {
   const [kinshipFrom, setKinshipFrom] = useState('');
   const [kinshipTo, setKinshipTo] = useState('');
   const [kinshipLoading, setKinshipLoading] = useState(false);
-  const kinshipRequestRef = useRef(0);
   const [toast, setToast] = useState(null);
   const [viewBox, setViewBox] = useState({ x: -400, y: -100, w: 1200, h: 700 });
   const [treeZoom, setTreeZoom] = useState(1);
   const [treePan, setTreePan] = useState({ x: 0, y: 0 });
   const dragRef = useRef(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [leftPanelOpen, setLeftPanelOpen] = useState(false);
-  const [currentTreeName, setCurrentTreeName] = useState('Gia phả hiện tại');
-  const [exportOpen, setExportOpen] = useState(false);
+  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
 
   // ─── Bộ lọc hiển thị cây ───────────────────────────────────
   const [filterOpen, setFilterOpen] = useState(false);
@@ -612,6 +605,19 @@ export default function FamilyTree() {
       setTreeData(normalizedData);
       const computed = buildLayout(normalizedData, filtersRef.current);
       setLayout(computed);
+
+      // Auto-fit viewBox
+      if (computed.nodes.length > 0) {
+        const xs = computed.nodes.map(n => n.x);
+        const ys = computed.nodes.map(n => n.y);
+        const minX = Math.min(...xs) - 80;
+        const minY = Math.min(...ys) - 80;
+        const maxX = Math.max(...xs) + NODE_WIDTH + 80;
+        const maxY = Math.max(...ys) + NODE_HEIGHT + 80;
+        setViewBox({ x: minX, y: minY, w: maxX - minX, h: maxY - minY });
+        setTreeZoom(1);
+        setTreePan({ x: 0, y: 0 });
+      }
       return computed;
     } catch (e) {
       setError('Không thể tải dữ liệu cây gia phả. ' + (e.response?.data?.message || ''));
@@ -640,10 +646,6 @@ export default function FamilyTree() {
     setTreeZoom(1);
     setTreePan({ x: 0, y: 0 });
   }, [layout.nodes]);
-
-  useEffect(() => {
-    membershipService.getCurrentTree().then(tree => setCurrentTreeName(tree?.name || 'Gia phả hiện tại')).catch(() => { });
-  }, []);
 
   useEffect(() => {
     if (searchParams.get('action') === 'create' && !loading) {
@@ -700,43 +702,13 @@ export default function FamilyTree() {
     }
   };
 
-  const handleRelationSave = async () => {
-    if (!selectedNode || !relationForm.targetId || !hasPermission('relationship.manage')) return;
-    setRelationSaving(true);
-    try {
-      const type = relationForm.type === 'spouse' ? 'spouse' : relationForm.type === 'adopted_child' ? 'adopted_child' : 'parent_child';
-      const personAId = relationForm.type === 'parent' || relationForm.type === 'adopted_child' ? relationForm.targetId : selectedNode.id;
-      const personBId = relationForm.type === 'parent' || relationForm.type === 'adopted_child' ? selectedNode.id : relationForm.targetId;
-      await relationshipService.createRelationship({ type, personAId, personBId, order: 1 });
-      const computed = await loadData();
-      setSelectedNode(computed?.nodes.find(node => node.id === selectedNode.id) || null);
-      setRelationForm({ type: 'parent', targetId: '' });
-    } catch (e) {
-      showToast(e.response?.data?.message || 'Không thể thêm quan hệ.', 'error');
-    } finally { setRelationSaving(false); }
-  };
-
-  const handleRelationDelete = async relation => {
-    if (!hasPermission('relationship.manage') || !relation?.id || !window.confirm('Xóa quan hệ này?')) return;
-    setRelationSaving(true);
-    try {
-      await relationshipService.deleteRelationship(relation.type === 'marriage' ? 'spouse' : 'parent', relation.id);
-      const computed = await loadData();
-      setSelectedNode(computed?.nodes.find(node => node.id === selectedNode.id) || null);
-    } catch (e) { showToast(e.response?.data?.message || 'Không thể xóa quan hệ.', 'error'); }
-    finally { setRelationSaving(false); }
-  };
-
   const handleCheckKinship = async () => {
     if (!kinshipFrom || !kinshipTo) return;
-    const requestId = ++kinshipRequestRef.current;
-    const fromId = kinshipFrom;
-    const toId = kinshipTo;
     setKinshipLoading(true);
     setKinship(null);
     try {
-      const result = await memberService.getKinship(fromId, toId);
-      if (requestId === kinshipRequestRef.current) setKinship(result);
+      const result = await memberService.getKinship(kinshipFrom, kinshipTo);
+      setKinship(result);
     } catch (e) {
       showToast('Không thể tính danh xưng.', 'error');
     } finally {
@@ -744,13 +716,13 @@ export default function FamilyTree() {
     }
   };
 
-  useEffect(() => {
-    if (kinshipFrom && kinshipTo && kinshipFrom !== kinshipTo) handleCheckKinship();
-    else setKinship(null);
-  }, [kinshipFrom, kinshipTo]);
-
   const changeTreeZoom = (amount) => {
     setTreeZoom(value => Math.min(2.5, Math.max(0.55, Number((value + amount).toFixed(2)))));
+  };
+
+  const handleTreeWheel = (event) => {
+    event.preventDefault();
+    changeTreeZoom(event.deltaY < 0 ? 0.1 : -0.1);
   };
 
   const handleTreeMouseDown = (event) => {
@@ -759,13 +731,12 @@ export default function FamilyTree() {
   };
 
   const handleTreeMouseMove = (event) => {
-    const drag = dragRef.current;
-    if (!drag) return;
+    if (!dragRef.current) return;
     const scaleX = viewBox.w / event.currentTarget.clientWidth / treeZoom;
     const scaleY = viewBox.h / event.currentTarget.clientHeight / treeZoom;
     setTreePan(pan => ({
-      x: pan.x - (event.clientX - drag.clientX) * scaleX,
-      y: pan.y - (event.clientY - drag.clientY) * scaleY
+      x: pan.x - (event.clientX - dragRef.current.clientX) * scaleX,
+      y: pan.y - (event.clientY - dragRef.current.clientY) * scaleY
     }));
     dragRef.current = { clientX: event.clientX, clientY: event.clientY };
   };
@@ -1036,13 +1007,9 @@ export default function FamilyTree() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', marginLeft: 64 }}>
+      <div className="family-tree-workspace" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Left: Controls */}
-        <div style={{ position: 'fixed', zIndex: 20, top: 72, left: 76, bottom: 16, width: 320, opacity: leftPanelOpen ? 1 : 0, pointerEvents: leftPanelOpen ? 'auto' : 'none', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 18px 50px rgba(0,0,0,0.25)', transition: 'opacity 160ms ease, transform 160ms ease', transform: leftPanelOpen ? 'translateY(0)' : 'translateY(-8px)' }}>
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <strong>Thành viên và danh xưng</strong>
-            <button className="btn btn-ghost btn-sm" onClick={() => setLeftPanelOpen(false)} aria-label="Đóng danh sách">✕</button>
-          </div>
+        <div className="family-tree-sidebar" style={{ width: leftPanelOpen ? 280 : 0, opacity: leftPanelOpen ? 1 : 0, background: 'var(--color-surface)', borderRight: leftPanelOpen ? '1px solid var(--color-border)' : 'none', display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'width 220ms ease, opacity 160ms ease' }}>
           {/* Search */}
           <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--color-border)' }}>
             <div style={{ position: 'relative' }}>
@@ -1098,6 +1065,9 @@ export default function FamilyTree() {
               <option value="">-- Người B --</option>
               {treeData.members.map(m => <option key={m.id} value={m.id}>{m.full_name}</option>)}
             </select>
+            <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={handleCheckKinship} disabled={!kinshipFrom || !kinshipTo || kinshipLoading}>
+              {kinshipLoading ? 'Đang tính...' : 'Xác định danh xưng'}
+            </button>
             {kinship && (
               <div style={{ marginTop: 10, background: 'var(--color-surface-2)', borderRadius: 8, padding: '10px 12px', fontSize: '0.82rem' }}>
                 <div style={{ fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>{kinship.description}</div>
@@ -1113,8 +1083,19 @@ export default function FamilyTree() {
           </div>
         </div>
 
+        <button className="family-tree-toggle btn btn-secondary btn-sm" title={leftPanelOpen ? 'Thu gọn bảng điều khiển' : 'Mở bảng điều khiển'} onClick={() => setLeftPanelOpen(value => !value)} style={{ position: 'absolute', left: leftPanelOpen ? 262 : 8, top: 12, zIndex: 4, transition: 'left 220ms ease' }}>
+          {leftPanelOpen ? '‹' : '›'}
+        </button>
+
         {/* Center: SVG Tree */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'auto' }}>
+        <div className="family-tree-canvas" style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 14, right: 14, zIndex: 2, display: 'flex', gap: 4, padding: 4, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
+            <button className="btn btn-secondary btn-sm" disabled={!hasPermission('tree_view.export')} onClick={exportTreePng}>PNG</button>
+            <button className="btn btn-secondary btn-sm" disabled={!hasPermission('tree_view.export')} onClick={exportTreePdf}>PDF</button>
+            <button className="btn btn-secondary btn-sm" title="Thu nhỏ cây" onClick={() => changeTreeZoom(-0.1)}><IconMinus /></button>
+            <button className="btn btn-secondary btn-sm" title="Đặt lại khung nhìn" onClick={resetTreeView}>{Math.round(treeZoom * 100)}%</button>
+            <button className="btn btn-secondary btn-sm" title="Phóng to cây" onClick={() => changeTreeZoom(0.1)}><IconPlus /></button>
+          </div>
           {loading && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)', flexDirection: 'column', gap: 12 }}>
               <div style={{ fontSize: '2rem' }}>🌳</div>
@@ -1143,14 +1124,13 @@ export default function FamilyTree() {
             </div>
           )}
 
-          {!loading && error && <div className="alert alert-error" role="alert" style={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 3 }}>{error}</div>}
-
           {!loading && layout.nodes.length > 0 && (
             <svg
               ref={svgRef}
               width="100%" height="100%"
-              style={{ minHeight: Math.max(700, viewBox.h), minWidth: Math.max(900, viewBox.w), background: 'var(--color-bg)', cursor: dragRef.current ? 'grabbing' : 'grab' }}
               viewBox={`${viewBox.x + treePan.x + viewBox.w * (1 - 1 / treeZoom) / 2} ${viewBox.y + treePan.y + viewBox.h * (1 - 1 / treeZoom) / 2} ${viewBox.w / treeZoom} ${viewBox.h / treeZoom}`}
+              style={{ background: 'var(--color-bg)', cursor: dragRef.current ? 'grabbing' : 'grab' }}
+              onWheel={handleTreeWheel}
               onMouseDown={handleTreeMouseDown}
               onMouseMove={handleTreeMouseMove}
               onMouseUp={() => { dragRef.current = null; }}
@@ -1401,6 +1381,7 @@ export default function FamilyTree() {
                     </div>
                   )}
                 </div>
+              ))}
 
                 {/* Cột phải: Thông tin liên hệ */}
                 <div style={{ background: 'var(--color-surface-alt)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
