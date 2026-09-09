@@ -72,7 +72,8 @@ export default function Dashboard() {
   // Tự động refresh permissions khi mount
   React.useEffect(() => {
     const treeId = localStorage.getItem('currentFamilyTreeId');
-    if (treeId) selectTree(treeId).catch(() => { });
+    const treeName = localStorage.getItem('currentFamilyTreeName');
+    if (treeId) selectTree(treeId, treeName).catch(() => { });
   }, []);
 
   React.useEffect(() => {

@@ -7,6 +7,7 @@ import { MemberFormModal } from './FamilyTree';
 import { formatMemberLunarDate } from '../utils/lunarCalendar';
 import { exportMembersToExcel } from '../utils/excelUtils';
 import { API_ORIGIN } from '../services/api';
+import FilterPanel from '../components/FilterPanel';
 
 const IconSearch = () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -33,6 +34,11 @@ export default function Members() {
     const [gender, setGender] = useState('all');
     const [status, setStatus] = useState('all');
     const [sortBy, setSortBy] = useState('name');
+    const [filterOpen, setFilterOpen] = useState(false);
+    const [draftSearch, setDraftSearch] = useState(search);
+    const [draftGender, setDraftGender] = useState(gender);
+    const [draftStatus, setDraftStatus] = useState(status);
+    const [draftSortBy, setDraftSortBy] = useState(sortBy);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
@@ -73,6 +79,26 @@ export default function Members() {
     useEffect(() => {
         setCurrentPage(1);
     }, [search, gender, status, sortBy]);
+
+    const resetFilter = () => {
+        setDraftSearch('');
+        setDraftGender('all');
+        setDraftStatus('all');
+        setDraftSortBy('name');
+        setSearch('');
+        setGender('all');
+        setStatus('all');
+        setSortBy('name');
+        setFilterOpen(false);
+    };
+
+    const applyFilter = () => {
+        setSearch(draftSearch);
+        setGender(draftGender);
+        setStatus(draftStatus);
+        setSortBy(draftSortBy);
+        setFilterOpen(false);
+    };
 
     const handleDelete = async member => {
         if (!hasPermission('member_list.delete') || !window.confirm(`Xóa thành viên ${member.fullName}?`)) return;
@@ -141,23 +167,45 @@ export default function Members() {
             <main className="page-content">
                 <div className="content-header-row"><div className="section-header"><h1 className="section-title">Danh sách thành viên</h1><p className="section-sub">Tra cứu và quản lý hồ sơ trong dòng họ hiện tại.</p></div><div className="content-header-actions"><div style={{ display: 'inline-flex', padding: 3, gap: 2, background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 8 }} role="tablist" aria-label="Chuyển chế độ xem"><button className="btn btn-ghost btn-sm" onClick={() => navigate('/family-tree')}>Cây</button><button className="btn btn-sm" style={{ background: 'var(--color-primary)', color: '#fff', border: 0 }} aria-selected="true">Danh sách</button></div><button className="btn btn-secondary btn-sm" onClick={loadMembers}><IconRefresh /> Làm mới</button><button className="btn btn-primary btn-sm" disabled={!hasPermission('member_list.create')} onClick={() => setModalOpen(true)}><IconPlus /> Thêm thành viên</button><button className="btn btn-secondary btn-sm" disabled={!hasPermission('tree_view.export')} onClick={exportExcel}>Xuất Excel</button></div></div>
 
-                <div className="card members-filter-card" style={{ padding: 16, marginBottom: 20 }}>
-                    <div className="members-filter-grid">
-                        <label className="members-search-wrap" style={{ position: 'relative' }}>
-                            <span className="members-search-icon" style={{ position: 'absolute', left: 10, top: 10, color: 'var(--color-text-muted)' }}><IconSearch /></span>
-                            <input className="input" style={{ paddingLeft: 34 }} value={search} onChange={event => setSearch(event.target.value)} placeholder="Tìm theo họ tên..." />
-                        </label>
-                        <select className="input" value={gender} onChange={event => setGender(event.target.value)}>
-                            <option value="all">Tất cả giới tính</option><option value="0">Nam</option><option value="1">Nữ</option><option value="2">Khác</option>
-                        </select>
-                        <select className="input" value={status} onChange={event => setStatus(event.target.value)}>
-                            <option value="all">Tất cả trạng thái</option><option value="alive">Còn sống</option><option value="dead">Đã mất</option>
-                        </select>
-                        <select className="input" value={sortBy} onChange={event => setSortBy(event.target.value)}>
-                            <option value="name">Sắp xếp theo tên</option><option value="generation">Theo đời</option><option value="birth">Theo năm sinh</option>
-                        </select>
+                <div className="card members-filter-card" style={{ padding: 16, marginBottom: 20, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <button className="btn btn-secondary btn-sm" type="button" onClick={() => setFilterOpen(!filterOpen)}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><IconSearch />Lọc</span>
+                        </button>
+                        <span style={{ color: 'var(--color-text-muted)', fontSize: '.84rem' }}>
+                            {search ? `Từ khóa: ${search}` : 'Tất cả'}
+                            {gender !== 'all' ? ` · ${gender === '0' ? 'Nam' : gender === '1' ? 'Nữ' : 'Khác'}` : ''}
+                            {status !== 'all' ? ` · ${status === 'alive' ? 'Còn sống' : 'Đã mất'}` : ''}
+                        </span>
                     </div>
                 </div>
+
+                <FilterPanel open={filterOpen} onClose={() => setFilterOpen(false)} onReset={resetFilter} onApply={applyFilter}>
+                    <div className="filter-grid">
+                        <label className="filter-field full">
+                            <span>Từ khóa</span>
+                            <input className="input" value={draftSearch} onChange={event => setDraftSearch(event.target.value)} placeholder="Tìm theo họ tên..." />
+                        </label>
+                        <label className="filter-field">
+                            <span>Giới tính</span>
+                            <select className="input" value={draftGender} onChange={event => setDraftGender(event.target.value)}>
+                                <option value="all">Tất cả giới tính</option><option value="0">Nam</option><option value="1">Nữ</option><option value="2">Khác</option>
+                            </select>
+                        </label>
+                        <label className="filter-field">
+                            <span>Trạng thái</span>
+                            <select className="input" value={draftStatus} onChange={event => setDraftStatus(event.target.value)}>
+                                <option value="all">Tất cả trạng thái</option><option value="alive">Còn sống</option><option value="dead">Đã mất</option>
+                            </select>
+                        </label>
+                        <label className="filter-field">
+                            <span>Sắp xếp</span>
+                            <select className="input" value={draftSortBy} onChange={event => setDraftSortBy(event.target.value)}>
+                                <option value="name">Sắp xếp theo tên</option><option value="generation">Theo đời</option><option value="birth">Theo năm sinh</option>
+                            </select>
+                        </label>
+                    </div>
+                </FilterPanel>
 
                 {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
                 <div className="card members-table-card" style={{ overflowX: 'auto' }}>
