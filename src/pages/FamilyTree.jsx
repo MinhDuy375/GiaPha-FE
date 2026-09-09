@@ -575,7 +575,6 @@ export default function FamilyTree() {
   const dragRef = useRef(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
-  const [currentTreeName, setCurrentTreeName] = useState('Gia phả hiện tại');
   const [exportOpen, setExportOpen] = useState(false);
 
   // ─── Bộ lọc hiển thị cây ───────────────────────────────────
@@ -640,10 +639,6 @@ export default function FamilyTree() {
     setTreeZoom(1);
     setTreePan({ x: 0, y: 0 });
   }, [layout.nodes]);
-
-  useEffect(() => {
-    membershipService.getCurrentTree().then(tree => setCurrentTreeName(tree?.name || 'Gia phả hiện tại')).catch(() => { });
-  }, []);
 
   useEffect(() => {
     if (searchParams.get('action') === 'create' && !loading) {
@@ -929,26 +924,137 @@ export default function FamilyTree() {
       )}
 
       <Navbar />
-      <div className="content-header-row family-tree-titlebar" style={{ alignItems: 'center', marginLeft: 72, marginRight: 16 }}>
-        <div className="content-header-actions">
-          <strong style={{ fontSize: '1.05rem' }}>{currentTreeName}</strong>
-          <button className="btn btn-secondary btn-sm" onClick={() => setLeftPanelOpen(true)} title="Danh sách thành viên"><IconList /> Danh sách</button>
-        </div>
-        <div className="content-header-actions">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} aria-label="Điều chỉnh kích thước cây">
-            <button className="btn btn-secondary btn-sm" title="Thu nhỏ cây" onClick={() => changeTreeZoom(-0.1)}><IconMinus /></button>
-            <button className="btn btn-ghost btn-sm" title="Đặt lại 100%" onClick={() => { setTreeZoom(1); setTreePan({ x: 0, y: 0 }); }} style={{ minWidth: 52 }}>{Math.round(treeZoom * 100)}%</button>
-            <button className="btn btn-secondary btn-sm" title="Phóng to cây" onClick={() => changeTreeZoom(0.1)}><IconPlus /></button>
-          </div>
-          <button className="btn btn-primary btn-sm" onClick={() => { returnToDetailIdRef.current = null; setEditingMember(null); setModalOpen(true); }}><IconPlus /> Thêm</button>
 
-          {/* Bộ lọc hiển thị */}
+      {/* ─── Toolbar (responsive) ───────────────────────────────── */}
+      <style>{`
+        .ft-toolbar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          padding: 8px 16px;
+          margin-left: 72px;
+          flex-wrap: nowrap;
+          box-sizing: border-box;
+        }
+        .ft-toolbar-left {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+        .ft-toolbar-right {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: nowrap;
+          justify-content: flex-end;
+          margin-left: auto;
+        }
+        .ft-zoom-group {
+          display: flex;
+          align-items: center;
+          gap: 2px;
+          flex-shrink: 0;
+        }
+        .ft-view-toggle {
+          display: inline-flex;
+          padding: 3px;
+          gap: 2px;
+          background: var(--color-surface-2);
+          border: 1px solid var(--color-border);
+          border-radius: 8px;
+          min-height: 40px;
+          align-items: center;
+          flex-shrink: 0;
+        }
+        .ft-filter-panel {
+          position: absolute;
+          top: calc(100% + 6px);
+          right: 0;
+          z-index: 40;
+          width: min(288px, calc(100vw - 32px));
+          max-height: min(480px, calc(100vh - 140px));
+          overflow-y: auto;
+          padding: 14px;
+          background: var(--color-surface);
+          border: 1px solid var(--color-border);
+          border-radius: 10px;
+          box-shadow: 0 10px 28px rgba(0,0,0,.2);
+          box-sizing: border-box;
+        }
+        .ft-export-panel {
+          position: absolute;
+          top: calc(100% + 6px);
+          right: 0;
+          z-index: 40;
+          min-width: 130px;
+          padding: 4px;
+          background: var(--color-surface);
+          border: 1px solid var(--color-border);
+          border-radius: 8px;
+          box-shadow: 0 10px 28px rgba(0,0,0,.2);
+          box-sizing: border-box;
+        }
+        .ft-btn-label { display: inline; }
+
+        /* ── Tablet / small desktop ─────────────────────────── */
+        @media (max-width: 900px) {
+          .ft-toolbar { margin-left: 56px; padding: 8px 10px; }
+        }
+
+        /* ── Mobile (< 640px) ───────────────────────────────── */
+        @media (max-width: 640px) {
+          .ft-toolbar {
+            margin-left: 0;
+            padding: 8px 10px;
+            flex-wrap: wrap;
+            row-gap: 8px;
+          }
+          .ft-toolbar-left { flex-shrink: 1; }
+          .ft-toolbar-right {
+            flex-wrap: wrap;
+            row-gap: 8px;
+            width: 100%;
+            justify-content: flex-start;
+            margin-left: 0;
+          }
+          .ft-zoom-group .btn-sm { min-width: 36px; padding: 0 6px; }
+          /* Ẩn chữ, chỉ giữ icon để tiết kiệm chỗ trên các nút phụ */
+          .ft-btn-label { display: none; }
+          .ft-view-toggle .btn-sm { padding: 0 10px; }
+        }
+
+        /* ── Rất nhỏ (< 380px) ──────────────────────────────── */
+        @media (max-width: 380px) {
+          .ft-toolbar-right { gap: 4px; }
+        }
+      `}</style>
+
+      <div className="ft-toolbar family-tree-titlebar">
+        <div className="ft-toolbar-left content-header-actions">
+          <button className="btn btn-secondary btn-sm" style={{ minHeight: 40, padding: '0 12px' }} onClick={() => setLeftPanelOpen(true)} title="Danh sách thành viên">
+            <IconList /> <span className="ft-btn-label">Danh sách</span>
+          </button>
+        </div>
+
+        <div className="ft-toolbar-right content-header-actions">
+          <div className="ft-zoom-group" aria-label="Điều chỉnh kích thước cây">
+            <button className="btn btn-secondary btn-sm" style={{ minHeight: 40, minWidth: 40, padding: '0 10px' }} title="Thu nhỏ cây" onClick={() => changeTreeZoom(-0.1)}><IconMinus /></button>
+            <button className="btn btn-ghost btn-sm" title="Đặt lại 100%" onClick={() => { setTreeZoom(1); setTreePan({ x: 0, y: 0 }); }} style={{ minWidth: 52, minHeight: 40, padding: '0 10px' }}>{Math.round(treeZoom * 100)}%</button>
+            <button className="btn btn-secondary btn-sm" style={{ minHeight: 40, minWidth: 40, padding: '0 10px' }} title="Phóng to cây" onClick={() => changeTreeZoom(0.1)}><IconPlus /></button>
+          </div>
+
+          <button className="btn btn-primary btn-sm" style={{ minHeight: 40, padding: '0 12px' }} onClick={() => { returnToDetailIdRef.current = null; setEditingMember(null); setModalOpen(true); }}>
+            <IconPlus /> <span className="ft-btn-label">Thêm</span>
+          </button>
+
           <div style={{ position: 'relative' }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => setFilterOpen(v => !v)}>
-              <IconFilter /> Bộ lọc{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+            <button className="btn btn-secondary btn-sm" style={{ minHeight: 40, padding: '0 12px' }} onClick={() => setFilterOpen(v => !v)}>
+              <IconFilter /> <span className="ft-btn-label">Bộ lọc</span>{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
             </button>
             {filterOpen && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 40, width: 288, padding: 14, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 10px 28px rgba(0,0,0,.2)' }}>
+              <div className="ft-filter-panel">
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', marginBottom: 14, cursor: 'pointer' }}>
                   <input type="checkbox" checked={filters.minimalView} onChange={e => setFilters(f => ({ ...f, minimalView: e.target.checked }))} />
                   Hiển thị dạng tối giản (chỉ hiện tên)
@@ -962,7 +1068,7 @@ export default function FamilyTree() {
                     <button
                       type="button"
                       className="btn btn-secondary btn-sm"
-                      style={{ padding: '4px 8px' }}
+                      style={{ padding: '4px 8px', minHeight: 40, minWidth: 40 }}
                       disabled={(filters.maxGeneration ?? maxGenAvailable) <= 1}
                       onClick={() => setFilters(f => {
                         const current = f.maxGeneration ?? maxGenAvailable;
@@ -987,7 +1093,7 @@ export default function FamilyTree() {
                     <button
                       type="button"
                       className="btn btn-secondary btn-sm"
-                      style={{ padding: '4px 8px' }}
+                      style={{ padding: '4px 8px', minHeight: 40, minWidth: 40 }}
                       disabled={(filters.maxGeneration ?? maxGenAvailable) >= maxGenAvailable}
                       onClick={() => setFilters(f => {
                         const current = f.maxGeneration ?? maxGenAvailable;
@@ -1023,15 +1129,20 @@ export default function FamilyTree() {
           </div>
 
           <div style={{ position: 'relative' }}>
-            <button className="btn btn-secondary btn-sm" disabled={!hasPermission('tree_view.export')} onClick={() => setExportOpen(value => !value)}>Xuất ▾</button>
-            {exportOpen && <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 40, minWidth: 130, padding: 4, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 10px 28px rgba(0,0,0,.2)' }}>
-              <button className="btn btn-ghost btn-sm" style={{ width: '100%', justifyContent: 'flex-start' }} onClick={() => { setExportOpen(false); exportTreePng(); }}>Xuất PNG</button>
-              <button className="btn btn-ghost btn-sm" style={{ width: '100%', justifyContent: 'flex-start' }} onClick={() => { setExportOpen(false); exportTreePdf(); }}>Xuất PDF</button>
-            </div>}
+            <button className="btn btn-secondary btn-sm" style={{ minHeight: 40, padding: '0 12px' }} disabled={!hasPermission('tree_view.export')} onClick={() => setExportOpen(value => !value)}>
+              <span className="ft-btn-label">Xuất</span> ▾
+            </button>
+            {exportOpen && (
+              <div className="ft-export-panel">
+                <button className="btn btn-ghost btn-sm" style={{ width: '100%', justifyContent: 'flex-start' }} onClick={() => { setExportOpen(false); exportTreePng(); }}>Xuất PNG</button>
+                <button className="btn btn-ghost btn-sm" style={{ width: '100%', justifyContent: 'flex-start' }} onClick={() => { setExportOpen(false); exportTreePdf(); }}>Xuất PDF</button>
+              </div>
+            )}
           </div>
-          <div style={{ display: 'inline-flex', padding: 3, gap: 2, background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 8 }} role="tablist" aria-label="Chuyển chế độ xem">
-            <button className="btn btn-sm" style={{ background: 'var(--color-primary)', color: '#fff', border: 0 }} aria-selected="true">Cây</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/members')}>Danh sách</button>
+
+          <div className="ft-view-toggle" role="tablist" aria-label="Chuyển chế độ xem">
+            <button className="btn btn-sm" style={{ background: 'var(--color-primary)', color: '#fff', border: 0, minHeight: 34, padding: '0 12px' }} aria-selected="true">Cây</button>
+            <button className="btn btn-ghost btn-sm" style={{ minHeight: 34, padding: '0 12px' }} onClick={() => navigate('/members')}>Danh sách</button>
           </div>
         </div>
       </div>

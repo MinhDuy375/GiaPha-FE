@@ -26,13 +26,14 @@ const authService = {
     return response.data;
   },
 
-  selectTree: async (familyTreeId) => {
+  selectTree: async (familyTreeId, familyTreeName) => {
     const response = await api.post('/auth/select-tree', { familyTreeId });
     if (response.data.accessToken) {
       localStorage.setItem('accessToken', response.data.accessToken);
       localStorage.setItem('currentFamilyTreeId', familyTreeId);
       localStorage.setItem('role', response.data.role);
       localStorage.setItem('permissions', JSON.stringify(response.data.permissions));
+      if (familyTreeName) localStorage.setItem('currentFamilyTreeName', familyTreeName);
     }
     return response.data;
   },
@@ -42,6 +43,7 @@ const authService = {
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     localStorage.removeItem('currentFamilyTreeId');
+    localStorage.removeItem('currentFamilyTreeName');
     localStorage.removeItem('role');
     localStorage.removeItem('permissions');
   },

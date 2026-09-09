@@ -3,6 +3,7 @@ import { useFamilyTree } from '../contexts/FamilyTreeContext';
 import userService from '../services/userService';
 import roleGroupService from '../services/roleGroupService';
 import Navbar from '../components/Navbar';
+import FilterPanel from '../components/FilterPanel';
 
 const IconSearch = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -93,6 +94,9 @@ export default function Users() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [editingUser, setEditingUser] = useState(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [draftSearch, setDraftSearch] = useState(search);
+  const [draftFilterStatus, setDraftFilterStatus] = useState(filterStatus);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -145,6 +149,20 @@ export default function Users() {
     } catch (e) { setError(e.response?.data?.message || 'Không thể xóa người dùng.'); }
   };
 
+  const resetFilter = () => {
+    setDraftSearch('');
+    setDraftFilterStatus('all');
+    setSearch('');
+    setFilterStatus('all');
+    setFilterOpen(false);
+  };
+
+  const applyFilter = () => {
+    setSearch(draftSearch);
+    setFilterStatus(draftFilterStatus);
+    setFilterOpen(false);
+  };
+
   return (
     <div className="page">
       <Navbar />
@@ -163,20 +181,34 @@ export default function Users() {
         {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
         {message && <div className="alert alert-success" style={{ marginBottom: 16 }}>{message}</div>}
 
-        {/* Bộ lọc */}
-        <div className="card" style={{ padding: 14, marginBottom: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) 180px', gap: 10 }}>
-            <label style={{ position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }}><IconSearch /></span>
-              <input className="input" style={{ paddingLeft: 34 }} value={search} onChange={e => setSearch(e.target.value)} placeholder="Tìm theo tên, username, email..." />
-            </label>
-            <select className="input" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-              <option value="all">Tất cả trạng thái</option>
-              <option value="active">Đang hoạt động</option>
-              <option value="locked">Đã khóa</option>
-            </select>
+        <div className="card" style={{ padding: 14, marginBottom: 16, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary btn-sm" type="button" onClick={() => setFilterOpen(!filterOpen)}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><IconSearch />Lọc</span>
+            </button>
+            <span style={{ color: 'var(--color-text-muted)', fontSize: '.84rem' }}>
+              {search ? `Từ khóa: ${search}` : 'Tất cả'}
+              {filterStatus !== 'all' ? ` · ${filterStatus === 'active' ? 'Hoạt động' : 'Đã khóa'}` : ''}
+            </span>
           </div>
         </div>
+
+        <FilterPanel open={filterOpen} onClose={() => setFilterOpen(false)} onReset={resetFilter} onApply={applyFilter}>
+          <div className="filter-grid">
+            <label className="filter-field full">
+              <span>Từ khóa</span>
+              <input className="input" value={draftSearch} onChange={e => setDraftSearch(e.target.value)} placeholder="Tên, username, email..." />
+            </label>
+            <label className="filter-field">
+              <span>Trạng thái</span>
+              <select className="input" value={draftFilterStatus} onChange={e => setDraftFilterStatus(e.target.value)}>
+                <option value="all">Tất cả trạng thái</option>
+                <option value="active">Đang hoạt động</option>
+                <option value="locked">Đã khóa</option>
+              </select>
+            </label>
+          </div>
+        </FilterPanel>
 
         {/* Bảng */}
         <div className="card" style={{ overflowX: 'auto' }}>

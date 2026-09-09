@@ -41,13 +41,14 @@ function MenuIcon({ name }) {
     images: 'M4 5h16v14H4zM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4M4 16l4-4 3 3 2-2 7 6',
     'user-plus': 'M15 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M19 8v6M16 11h6',
     chart: 'M4 19V5M4 19h16M8 16v-4M12 16V8M16 16V4',
+    switch: 'M16 3l4 4-4 4M20 7H10M8 21l-4-4 4-4M4 17h10',
   };
   return <svg className="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name] || paths.tree} /></svg>;
 }
 
 export default function Navbar({ children }) {
   const { user, logout } = useAuth();
-  const { role, permissions = [], clearSelectedTree } = useFamilyTree();
+  const { permissions = [], currentTreeName, clearSelectedTree } = useFamilyTree();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -55,14 +56,6 @@ export default function Navbar({ children }) {
   const [sidebarHovered, setSidebarHovered] = useState(false);
   const [navigation, setNavigation] = useState([]);
   const menuRef = useRef(null);
-  const [isMobileLayout, setIsMobileLayout] = useState(() => window.innerWidth <= 640);
-  const [showAccountInfo, setShowAccountInfo] = useState(false);
-
-  useEffect(() => {
-    const onResize = () => setIsMobileLayout(window.innerWidth <= 640);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -99,15 +92,36 @@ export default function Navbar({ children }) {
   const sidebarOpen = sidebarPinned || sidebarHovered || mobileMenuOpen;
   const visibleMenus = navigation.filter(menu => menu.permissions?.some(permission => permissions.includes(permission)) && menuRoutes[menu.alias]);
 
-  const roleChipClass = role === 'Quản trị viên' ? 'chip chip-primary' : role === 'Người biên tập' ? 'chip chip-amber' : 'chip chip-green';
-
   return (
     <>
       <div className={`mobile-backdrop ${mobileMenuOpen ? 'mobile-backdrop-visible' : ''}`} onClick={closeMobileDrawer} />
       <aside className={`sidebar ${sidebarOpen ? 'sidebar-expanded' : 'sidebar-collapsed'} ${mobileMenuOpen ? 'sidebar-mobile-open' : ''}`} aria-label="Điều hướng gia phả" onMouseEnter={() => setSidebarHovered(true)} onMouseLeave={() => setSidebarHovered(false)}>
         <div className="sidebar-heading">
-          <button className="sidebar-toggle" onClick={toggleSidebar} title={sidebarPinned ? 'Thu gọn menu' : 'Ghim menu mở rộng'}>{sidebarPinned ? '‹' : '›'}</button></div>
-        <nav className="sidebar-nav">{visibleMenus.map(menu => <button key={menu.id} className="sidebar-item" title={sidebarOpen ? undefined : menu.name} onClick={() => navigate(menuRoutes[menu.alias])}><MenuIcon name={menu.icon} /><span>{menu.name}</span></button>)}<button className="sidebar-item sidebar-switch" title={sidebarOpen ? undefined : 'Đổi dòng họ'} onClick={() => { clearSelectedTree(); navigate('/select-tree'); }}><MenuIcon name="tree" /><span>Đổi dòng họ</span></button></nav>
+          <button className="sidebar-toggle" onClick={toggleSidebar} title={sidebarPinned ? 'Thu gọn menu' : 'Ghim menu mở rộng'}>{sidebarPinned ? '‹' : '›'}</button>
+        </div>
+        <nav className="sidebar-nav">
+          {visibleMenus.map(menu => (
+            <button key={menu.id} className="sidebar-item" title={sidebarOpen ? undefined : menu.name} onClick={() => navigate(menuRoutes[menu.alias])}>
+              <MenuIcon name={menu.icon} /><span>{menu.name}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-footer">
+          {currentTreeName && (
+            <div className="sidebar-tree-card" title={currentTreeName}>
+              <span className="sidebar-tree-label">Dòng họ hiện tại</span>
+              <span className="sidebar-tree-name">{currentTreeName}</span>
+            </div>
+          )}
+          <button
+            className="sidebar-item sidebar-switch"
+            title="Đổi dòng họ"
+            onClick={() => { clearSelectedTree(); navigate('/select-tree'); }}
+          >
+            <MenuIcon name="switch" />
+            <span>Đổi dòng họ</span>
+          </button>
+        </div>
       </aside>
       <nav className="navbar" aria-label="Main navigation">
         <div className="navbar-inner">
@@ -133,8 +147,6 @@ export default function Navbar({ children }) {
                 <div className="navbar-avatar" aria-label={"User " + (user?.fullName || user?.username)}>
                   {(user?.fullName || user?.username)?.charAt(0).toUpperCase()}
                 </div>
-                <span style={{ fontWeight: 500, fontSize: "0.9rem" }}>{user?.fullName || user?.username}</span>
-                {role && <span className={roleChipClass}>{role}</span>}
               </div>
 
               {menuOpen && (
@@ -144,31 +156,10 @@ export default function Navbar({ children }) {
                   borderRadius: 'var(--radius-lg)', boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
                   width: 220, zIndex: 100, overflow: 'hidden'
                 }}>
-                  <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--color-text-primary)' }}>{user?.fullName || user?.username}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>{user?.email}</div>
-                      </div>
-                      {isMobileLayout && (
-                        <button
-                          className="mobile-account-info-toggle"
-                          onClick={() => setShowAccountInfo(v => !v)}
-                          style={{
-                            border: '1px solid var(--color-border)', background: 'var(--color-surface)',
-                            color: 'var(--color-text-primary)', borderRadius: 8, padding: '6px 8px', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap'
-                          }}
-                        >
-                          {showAccountInfo ? 'Ẩn' : 'Tài khoản'}
-                        </button>
-                      )}
+                  <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="navbar-avatar" aria-label={"User " + (user?.fullName || user?.username)}>
+                      {(user?.fullName || user?.username)?.charAt(0).toUpperCase()}
                     </div>
-
-                    {(!isMobileLayout || showAccountInfo) && (
-                      <div className="navbar-account-role-row" style={{ marginTop: 8 }}>
-                        {role && <span className={roleChipClass}>{role}</span>}
-                      </div>
-                    )}
                   </div>
                   <div style={{ padding: 4 }}>
                     <button
