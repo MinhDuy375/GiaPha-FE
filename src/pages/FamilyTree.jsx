@@ -921,7 +921,7 @@ export default function FamilyTree() {
   const resetFilters = () => setFilters({ minimalView: false, maxGeneration: null, hideInLaw: false, hideMale: false, hideFemale: false });
 
   return (
-    <div className="page" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div className="page family-tree-page" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', height: '100vh' }}>
       {toast && (
         <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999, padding: '12px 20px', borderRadius: 10, background: toast.type === 'error' ? '#ef4444' : toast.type === 'info' ? '#3b82f6' : '#22c55e', color: '#fff', fontWeight: 600, fontSize: '0.9rem', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
           {toast.msg}
@@ -1036,7 +1036,7 @@ export default function FamilyTree() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', marginLeft: 64 }}>
+      <div className="family-tree-main-content" style={{ display: 'flex', flex: 1, overflow: 'hidden', marginLeft: 0 }}>
         {/* Left: Controls */}
         <div style={{ position: 'fixed', zIndex: 20, top: 72, left: 76, bottom: 16, width: 320, opacity: leftPanelOpen ? 1 : 0, pointerEvents: leftPanelOpen ? 'auto' : 'none', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 18px 50px rgba(0,0,0,0.25)', transition: 'opacity 160ms ease, transform 160ms ease', transform: leftPanelOpen ? 'translateY(0)' : 'translateY(-8px)' }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1114,7 +1114,7 @@ export default function FamilyTree() {
         </div>
 
         {/* Center: SVG Tree */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'auto' }}>
+        <div className="family-tree-canvas-region" style={{ flex: 1, position: 'relative', overflow: 'auto' }}>
           {loading && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)', flexDirection: 'column', gap: 12 }}>
               <div style={{ fontSize: '2rem' }}>🌳</div>
@@ -1123,7 +1123,7 @@ export default function FamilyTree() {
           )}
 
           {!loading && layout.nodes.length === 0 && (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
+            <div className="family-tree-empty-state" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
               <div style={{ fontSize: '4rem' }}>🌿</div>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>

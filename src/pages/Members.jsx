@@ -38,6 +38,8 @@ export default function Members() {
     const [modalOpen, setModalOpen] = useState(false);
     const [editingMember, setEditingMember] = useState(null);
     const [selectedMember, setSelectedMember] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 10;
 
     const loadMembers = async () => {
         setLoading(true);
@@ -62,6 +64,15 @@ export default function Members() {
             if (sortBy === 'birth') return (first.birthYear || 9999) - (second.birthYear || 9999);
             return (first.fullName || '').localeCompare(second.fullName || '', 'vi');
         }), [members, search, gender, status, sortBy]);
+
+    const pageCount = Math.max(1, Math.ceil(filteredMembers.length / pageSize));
+    const safePage = Math.min(currentPage, pageCount);
+    const startIndex = (safePage - 1) * pageSize;
+    const paginatedMembers = filteredMembers.slice(startIndex, startIndex + pageSize);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, gender, status, sortBy]);
 
     const handleDelete = async member => {
         if (!hasPermission('member_list.delete') || !window.confirm(`Xóa thành viên ${member.fullName}?`)) return;
@@ -130,10 +141,10 @@ export default function Members() {
             <main className="page-content">
                 <div className="content-header-row"><div className="section-header"><h1 className="section-title">Danh sách thành viên</h1><p className="section-sub">Tra cứu và quản lý hồ sơ trong dòng họ hiện tại.</p></div><div className="content-header-actions"><div style={{ display: 'inline-flex', padding: 3, gap: 2, background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 8 }} role="tablist" aria-label="Chuyển chế độ xem"><button className="btn btn-ghost btn-sm" onClick={() => navigate('/family-tree')}>Cây</button><button className="btn btn-sm" style={{ background: 'var(--color-primary)', color: '#fff', border: 0 }} aria-selected="true">Danh sách</button></div><button className="btn btn-secondary btn-sm" onClick={loadMembers}><IconRefresh /> Làm mới</button><button className="btn btn-primary btn-sm" disabled={!hasPermission('member_list.create')} onClick={() => setModalOpen(true)}><IconPlus /> Thêm thành viên</button><button className="btn btn-secondary btn-sm" disabled={!hasPermission('tree_view.export')} onClick={exportExcel}>Xuất Excel</button></div></div>
 
-                <div className="card" style={{ padding: 16, marginBottom: 20 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) repeat(3, minmax(130px, 180px))', gap: 10 }}>
-                        <label style={{ position: 'relative' }}>
-                            <span style={{ position: 'absolute', left: 10, top: 10, color: 'var(--color-text-muted)' }}><IconSearch /></span>
+                <div className="card members-filter-card" style={{ padding: 16, marginBottom: 20 }}>
+                    <div className="members-filter-grid">
+                        <label className="members-search-wrap" style={{ position: 'relative' }}>
+                            <span className="members-search-icon" style={{ position: 'absolute', left: 10, top: 10, color: 'var(--color-text-muted)' }}><IconSearch /></span>
                             <input className="input" style={{ paddingLeft: 34 }} value={search} onChange={event => setSearch(event.target.value)} placeholder="Tìm theo họ tên..." />
                         </label>
                         <select className="input" value={gender} onChange={event => setGender(event.target.value)}>
@@ -149,26 +160,34 @@ export default function Members() {
                 </div>
 
                 {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
-                <div className="card" style={{ overflowX: 'auto' }}>
+                <div className="card members-table-card" style={{ overflowX: 'auto' }}>
                     {loading ? <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>Đang tải danh sách...</div> : (
-                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
-                            <thead><tr style={{ textAlign: 'left', borderBottom: '1px solid var(--color-border)' }}>
-                                <th style={{ padding: '14px 16px' }}>Thành viên</th><th style={{ padding: '14px 16px' }}>Giới tính</th><th style={{ padding: '14px 16px' }}>Đời</th><th style={{ padding: '14px 16px' }}>Sinh - mất</th><th style={{ padding: '14px 16px' }}>Nghề nghiệp</th><th style={{ padding: '14px 16px' }}>Ghi chú</th><th style={{ padding: '14px 16px' }}>Thao tác</th>
-                            </tr></thead>
-                            <tbody>{filteredMembers.map(member => <tr key={member.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                                <td style={{ padding: '13px 16px', fontWeight: 700 }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 34, height: 34, borderRadius: '50%', overflow: 'hidden', background: 'var(--color-surface-2)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>{member.avatarUrl ? <img src={member.avatarUrl.startsWith('http') ? member.avatarUrl : `${API_ORIGIN}${member.avatarUrl}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : member.fullName?.slice(0, 1)}</div><span>{member.fullName}</span></div></td>
-                                <td style={{ padding: '13px 16px' }}>{member.gender === 0 ? 'Nam' : member.gender === 1 ? 'Nữ' : 'Khác'}</td>
-                                <td style={{ padding: '13px 16px' }}>{member.generationLevel || 'Không rõ'}</td>
-                                <td style={{ padding: '13px 16px' }}>{member.birthYear || '?'} - {member.deathYear || (member.isAlive ? 'nay' : '?')}</td>
-                                <td style={{ padding: '13px 16px' }}>{member.occupation || 'Chưa cập nhật'}</td>
-                                <td style={{ padding: '13px 16px', maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--color-text-secondary)' }} title={member.note || ''}>{member.note || 'Không có ghi chú'}</td>
-                                <td style={{ padding: '13px 16px', whiteSpace: 'nowrap' }}>
-                                    <button className="btn btn-secondary btn-sm" onClick={() => setSelectedMember(member)}>Xem</button>{' '}
-                                    <button className="btn btn-secondary btn-sm" disabled={!hasPermission('member_list.edit')} onClick={() => openEdit(member)}>Sửa</button>{' '}
-                                    <button className="btn btn-sm" disabled={!hasPermission('member_list.delete')} onClick={() => handleDelete(member)} style={{ color: '#ef4444' }}>Xóa</button>
-                                </td>
-                            </tr>)}</tbody>
-                        </table>
+                        <>
+                            <table className="members-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
+                                <thead><tr style={{ textAlign: 'left', borderBottom: '1px solid var(--color-border)' }}>
+                                    <th style={{ padding: '14px 16px' }}>Thành viên</th><th style={{ padding: '14px 16px' }}>Giới tính</th><th style={{ padding: '14px 16px' }}>Đời</th><th style={{ padding: '14px 16px' }}>Sinh - mất</th><th style={{ padding: '14px 16px' }}>Nghề nghiệp</th><th style={{ padding: '14px 16px' }}>Ghi chú</th><th style={{ padding: '14px 16px' }}>Thao tác</th>
+                                </tr></thead>
+                                <tbody>{paginatedMembers.map(member => <tr key={member.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                                    <td style={{ padding: '13px 16px', fontWeight: 700 }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 34, height: 34, borderRadius: '50%', overflow: 'hidden', background: 'var(--color-surface-2)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>{member.avatarUrl ? <img src={member.avatarUrl.startsWith('http') ? member.avatarUrl : `${API_ORIGIN}${member.avatarUrl}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : member.fullName?.slice(0, 1)}</div><span>{member.fullName}</span></div></td>
+                                    <td style={{ padding: '13px 16px' }}>{member.gender === 0 ? 'Nam' : member.gender === 1 ? 'Nữ' : 'Khác'}</td>
+                                    <td style={{ padding: '13px 16px' }}>{member.generationLevel || 'Không rõ'}</td>
+                                    <td style={{ padding: '13px 16px' }}>{member.birthYear || '?'} - {member.deathYear || (member.isAlive ? 'nay' : '?')}</td>
+                                    <td style={{ padding: '13px 16px' }}>{member.occupation || 'Chưa cập nhật'}</td>
+                                    <td style={{ padding: '13px 16px', maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--color-text-secondary)' }} title={member.note || ''}>{member.note || 'Không có ghi chú'}</td>
+                                    <td style={{ padding: '13px 16px', whiteSpace: 'nowrap' }}>
+                                        <button className="btn btn-secondary btn-sm" onClick={() => setSelectedMember(member)}>Xem</button>{' '}
+                                        <button className="btn btn-secondary btn-sm" disabled={!hasPermission('member_list.edit')} onClick={() => openEdit(member)}>Sửa</button>{' '}
+                                        <button className="btn btn-sm" disabled={!hasPermission('member_list.delete')} onClick={() => handleDelete(member)} style={{ color: '#ef4444' }}>Xóa</button>
+                                    </td>
+                                </tr>)}</tbody>
+                            </table>
+
+                            <div className="members-pagination">
+                                <button className="btn btn-secondary btn-sm" disabled={safePage <= 1} onClick={() => setCurrentPage(page => Math.max(1, page - 1))}>Trước</button>
+                                <span className="members-page-status">Trang {safePage}/{pageCount}</span>
+                                <button className="btn btn-secondary btn-sm" disabled={safePage >= pageCount} onClick={() => setCurrentPage(page => Math.min(pageCount, page + 1))}>Sau</button>
+                            </div>
+                        </>
                     )}
                     {!loading && filteredMembers.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>Không tìm thấy thành viên phù hợp.</div>}
                 </div>

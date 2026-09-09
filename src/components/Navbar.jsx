@@ -50,10 +50,19 @@ export default function Navbar({ children }) {
   const { role, permissions = [], clearSelectedTree } = useFamilyTree();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarPinned, setSidebarPinned] = useState(() => localStorage.getItem('sidebarPinned') === 'true');
   const [sidebarHovered, setSidebarHovered] = useState(false);
   const [navigation, setNavigation] = useState([]);
   const menuRef = useRef(null);
+  const [isMobileLayout, setIsMobileLayout] = useState(() => window.innerWidth <= 640);
+  const [showAccountInfo, setShowAccountInfo] = useState(false);
+
+  useEffect(() => {
+    const onResize = () => setIsMobileLayout(window.innerWidth <= 640);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -69,29 +78,49 @@ export default function Navbar({ children }) {
     roleGroupService.getNavigation().then(setNavigation).catch(() => setNavigation([]));
   }, []);
 
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth > 640) setMobileMenuOpen(false);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const toggleSidebar = () => {
     setSidebarPinned(value => {
       localStorage.setItem('sidebarPinned', String(!value));
       return !value;
     });
   };
-  const sidebarOpen = sidebarPinned || sidebarHovered;
+
+  const openMobileDrawer = () => setMobileMenuOpen(true);
+  const closeMobileDrawer = () => setMobileMenuOpen(false);
+
+  const sidebarOpen = sidebarPinned || sidebarHovered || mobileMenuOpen;
   const visibleMenus = navigation.filter(menu => menu.permissions?.some(permission => permissions.includes(permission)) && menuRoutes[menu.alias]);
 
   const roleChipClass = role === 'Quản trị viên' ? 'chip chip-primary' : role === 'Người biên tập' ? 'chip chip-amber' : 'chip chip-green';
 
   return (
     <>
-      <aside className={`sidebar ${sidebarOpen ? 'sidebar-expanded' : 'sidebar-collapsed'}`} aria-label="Điều hướng gia phả" onMouseEnter={() => setSidebarHovered(true)} onMouseLeave={() => setSidebarHovered(false)}>
+      <div className={`mobile-backdrop ${mobileMenuOpen ? 'mobile-backdrop-visible' : ''}`} onClick={closeMobileDrawer} />
+      <aside className={`sidebar ${sidebarOpen ? 'sidebar-expanded' : 'sidebar-collapsed'} ${mobileMenuOpen ? 'sidebar-mobile-open' : ''}`} aria-label="Điều hướng gia phả" onMouseEnter={() => setSidebarHovered(true)} onMouseLeave={() => setSidebarHovered(false)}>
         <div className="sidebar-heading">
           <button className="sidebar-toggle" onClick={toggleSidebar} title={sidebarPinned ? 'Thu gọn menu' : 'Ghim menu mở rộng'}>{sidebarPinned ? '‹' : '›'}</button></div>
         <nav className="sidebar-nav">{visibleMenus.map(menu => <button key={menu.id} className="sidebar-item" title={sidebarOpen ? undefined : menu.name} onClick={() => navigate(menuRoutes[menu.alias])}><MenuIcon name={menu.icon} /><span>{menu.name}</span></button>)}<button className="sidebar-item sidebar-switch" title={sidebarOpen ? undefined : 'Đổi dòng họ'} onClick={() => { clearSelectedTree(); navigate('/select-tree'); }}><MenuIcon name="tree" /><span>Đổi dòng họ</span></button></nav>
       </aside>
       <nav className="navbar" aria-label="Main navigation">
         <div className="navbar-inner">
-          <div className="navbar-brand" style={{ cursor: 'pointer' }} onClick={() => navigate('/')}>
-            <img src="/public/chimlactrans.png" alt="Logo" className="navbar-logo" style={{ width: '30px' }} />
-            Lạc Việt
+          <div className="navbar-left">
+            <button className="mobile-menu-button" aria-label="Mở menu" onClick={mobileMenuOpen ? closeMobileDrawer : openMobileDrawer}>
+              <span className="mobile-menu-icon">
+                <span /><span /><span />
+              </span>
+            </button>
+            <div className="navbar-brand" style={{ cursor: 'pointer' }} onClick={() => navigate('/')}>
+              <img src="/public/chimlactrans.png" alt="Logo" className="navbar-logo" style={{ width: '30px' }} />
+              Lạc Việt
+            </div>
           </div>
 
           <div className="navbar-actions">
@@ -116,8 +145,30 @@ export default function Navbar({ children }) {
                   width: 220, zIndex: 100, overflow: 'hidden'
                 }}>
                   <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--color-text-primary)' }}>{user?.fullName || user?.username}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>{user?.email}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--color-text-primary)' }}>{user?.fullName || user?.username}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>{user?.email}</div>
+                      </div>
+                      {isMobileLayout && (
+                        <button
+                          className="mobile-account-info-toggle"
+                          onClick={() => setShowAccountInfo(v => !v)}
+                          style={{
+                            border: '1px solid var(--color-border)', background: 'var(--color-surface)',
+                            color: 'var(--color-text-primary)', borderRadius: 8, padding: '6px 8px', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {showAccountInfo ? 'Ẩn' : 'Tài khoản'}
+                        </button>
+                      )}
+                    </div>
+
+                    {(!isMobileLayout || showAccountInfo) && (
+                      <div className="navbar-account-role-row" style={{ marginTop: 8 }}>
+                        {role && <span className={roleChipClass}>{role}</span>}
+                      </div>
+                    )}
                   </div>
                   <div style={{ padding: 4 }}>
                     <button
