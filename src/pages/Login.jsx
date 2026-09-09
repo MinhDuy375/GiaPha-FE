@@ -116,19 +116,19 @@ export default function Login() {
               <div className="form-input-wrapper">
                 <span className="form-input-icon"><IconLock /></span>
                 <input id="login-password" type={showPw ? "text" : "password"} className="form-input has-suffix"
-                  placeholder="Nhap mat khau..." value={password} onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Nhập mật khẩu..." value={password} onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password" required aria-required="true" />
                 <button type="button" className="form-input-suffix" onClick={() => setShowPw(!showPw)}
-                  aria-label={showPw ? "An mat khau" : "Hien mat khau"}>
+                  aria-label={showPw ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}>
                   {showPw ? <IconEyeOff /> : <IconEye />}
                 </button>
               </div>
             </div>
             <button type="submit" id="btn-login" className="btn btn-primary btn-full btn-lg" disabled={loading} style={{ marginTop: "8px" }}>
-              {loading ? <span className="spinner" aria-label="Dang xu ly..." /> : "Dang nhap"}
+              {loading ? <span className="spinner" aria-label="Đang xử lí ..." /> : "Đăng nhập"}
             </button>
           </form>
-          <div className="divider-label">hoac</div>
+          <div className="divider-label">hoặc</div>
           <div style={{ textAlign: "center", fontSize: "0.9375rem", color: "var(--color-text-secondary)" }}>
             Chưa có tài khoản?{" "}
             <Link to="/register" style={{ color: "var(--color-primary)", fontWeight: 600 }}>Đăng ký ngay</Link>

@@ -88,15 +88,15 @@ export default function Dashboard() {
       <Navbar />
       <main className="page-content">
 
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 0.8fr) minmax(300px, 1.2fr)", gap: 16, marginBottom: 32 }}>
-          <div className="card" style={{ padding: 22 }}>
-            <div style={{ color: "var(--color-text-muted)", fontSize: "0.76rem", fontWeight: 700, textTransform: "uppercase" }}>Hôm nay</div>
-            <div style={{ fontSize: "1.45rem", fontWeight: 800, marginTop: 8 }}>{today.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
-            <div style={{ color: "var(--color-text-muted)", marginTop: 6 }}>Âm lịch: {formatLunarDate(today)}</div>
+        <div className="dashboard-top-grid">
+          <div className="card dashboard-date-card">
+            <div className="dashboard-label">Hôm nay</div>
+            <div className="dashboard-date-text">{today.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
+            <div className="dashboard-lunar-text">Âm lịch: {formatLunarDate(today)}</div>
           </div>
-          <div className="card" style={{ padding: 22 }}>
-            <div style={{ color: "var(--color-text-muted)", fontSize: "0.76rem", fontWeight: 700, textTransform: "uppercase" }}>Sự kiện hôm nay và sắp tới</div>
-            {upcomingEvents.length ? upcomingEvents.map(event => <div key={event.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: "1px solid var(--color-border)" }}><span style={{ fontWeight: 650 }}>{event.title}</span><span style={{ color: "var(--color-text-muted)", whiteSpace: "nowrap", textAlign: "right" }}>{new Date(event.eventDate).toLocaleDateString('vi-VN')}<br /><small>Âm: {formatLunarDate(event.eventDate)}</small></span></div>) : <div style={{ color: "var(--color-text-muted)", marginTop: 10 }}>Chưa có sự kiện sắp tới.</div>}
+          <div className="card dashboard-event-card">
+            <div className="dashboard-label">Sự kiện hôm nay và sắp tới</div>
+            {upcomingEvents.length ? upcomingEvents.map(event => <div key={event.id} className="dashboard-event-row"><span className="dashboard-event-title">{event.title}</span><span className="dashboard-event-meta">{new Date(event.eventDate).toLocaleDateString('vi-VN')}<br /><small>Âm: {formatLunarDate(event.eventDate)}</small></span></div>) : <div className="dashboard-empty-event">Chưa có sự kiện sắp tới.</div>}
           </div>
         </div>
 
@@ -104,7 +104,7 @@ export default function Dashboard() {
           <h2 className="section-title">Tính năng hệ thống</h2>
           <p className="section-sub">Các chức năng được phân quyền theo vai trò của bạn trong dòng họ.</p>
         </div>
-        <div className="grid-3" style={{ marginBottom: 48 }}>
+        <div className="dashboard-feature-grid">
           {features.map((feat) => {
             const allowed = has(feat.perm);
             return (
@@ -120,7 +120,7 @@ export default function Dashboard() {
                 <div className={"feature-icon " + feat.iconClass} aria-hidden="true">{feat.icon}</div>
                 <h3 className="feature-title">{feat.title}</h3>
                 <p className="feature-desc">{feat.desc}</p>
-                <div style={{ marginTop: 12, color: allowed ? 'var(--color-primary)' : 'var(--color-text-muted)', fontSize: '0.8rem', fontWeight: 700 }}>
+                <div className={allowed ? 'feature-access-open' : 'feature-access-denied'}>
                   {allowed ? `Mở ${feat.title} →` : "Không đủ quyền"}
                 </div>
               </div>
