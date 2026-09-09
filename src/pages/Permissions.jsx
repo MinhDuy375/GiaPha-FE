@@ -360,17 +360,17 @@ export default function Permissions() {
 
       <main className="page-content">
         {/* Page Header */}
-        <div style={{ marginBottom: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
+        <div className="permissions-page-header">
           <div>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: 4 }}>
+            <h1 className="permissions-page-title">
               Phân quyền Dòng họ
             </h1>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
+            <p className="permissions-page-description">
               Quản lý các nhóm quyền và cấu hình ma trận phân quyền cho từng nhóm.
             </p>
           </div>
           {canManage && (
-            <button className="btn btn-primary" onClick={handleOpenCreate} id="btn-create-role-group">
+            <button className="btn btn-primary permissions-create-button" onClick={handleOpenCreate} id="btn-create-role-group">
               <IconPlus /> Tạo nhóm quyền
             </button>
           )}
@@ -388,56 +388,45 @@ export default function Permissions() {
             Đang tải dữ liệu phân quyền...
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 20, alignItems: 'start' }}>
+          <div className="permissions-layout">
             {/* Left Panel: Role Groups */}
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}>
-                <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div className="card permissions-group-panel">
+              <div className="permissions-group-heading">
+                <div className="permissions-group-heading-text">
                   Nhóm quyền ({roleGroups.length})
                 </div>
               </div>
-              <div style={{ padding: '8px' }}>
+              <div className="permissions-group-list">
                 {roleGroups.map(g => (
                   <div
                     key={g.id}
                     onClick={() => setSelectedGroup(g)}
                     id={`rg-item-${g.id}`}
-                    style={{
-                      padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                      background: selectedGroup?.id === g.id ? 'rgba(var(--color-primary-rgb,180,80,30),0.12)' : 'transparent',
-                      border: `1px solid ${selectedGroup?.id === g.id ? 'var(--color-primary)' : 'transparent'}`,
-                      marginBottom: 4, transition: 'all 0.15s',
-                      display: 'flex', alignItems: 'center', gap: 8,
-                    }}
+                    className={`permissions-role-group ${selectedGroup?.id === g.id ? 'permissions-role-group-active' : ''}`}
                   >
-                    <div style={{
-                      width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                      background: selectedGroup?.id === g.id ? 'var(--color-primary)' : 'var(--color-surface-2)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: selectedGroup?.id === g.id ? '#fff' : 'var(--color-text-muted)',
-                    }}>
+                    <div className={`permissions-role-icon ${selectedGroup?.id === g.id ? 'permissions-role-icon-active' : ''}`}>
                       <IconShield />
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div className="permissions-role-content">
+                      <div className="permissions-role-name">
                         {g.name}
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                      <div className="permissions-role-count">
                         {g.permissions.length} quyền
                       </div>
                     </div>
                     {canManage && (
-                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                      <div className="permissions-role-actions" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => handleOpenEdit(g)}
                           title="Chỉnh sửa"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: 4, borderRadius: 4 }}
+                          className="permissions-group-button permissions-edit-button"
                           id={`btn-edit-${g.id}`}
                         ><IconEdit /></button>
                         <button
                           onClick={() => setDeleteConfirm(g)}
                           title="Xóa"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4, borderRadius: 4 }}
+                          className="permissions-group-button permissions-delete-button"
                           id={`btn-delete-${g.id}`}
                         ><IconTrash /></button>
                       </div>
@@ -446,7 +435,7 @@ export default function Permissions() {
                 ))}
 
                 {roleGroups.length === 0 && (
-                  <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+                  <div className="permissions-empty-group">
                     Chưa có nhóm quyền nào.
                   </div>
                 )}
@@ -454,26 +443,18 @@ export default function Permissions() {
             </div>
 
             {/* Right Panel: Permission Matrix view */}
-            <div>
+            <div className="permissions-detail-panel">
               {selectedGroup ? (
-                <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                  <div style={{
-                    padding: '16px 20px', borderBottom: '1px solid var(--color-border)',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    background: 'var(--color-surface-2)',
-                  }}>
+                <div className="card permissions-detail-card">
+                  <div className="permissions-detail-header">
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text-primary)' }}>{selectedGroup.name}</div>
+                      <div className="permissions-selected-group-name">{selectedGroup.name}</div>
                       {selectedGroup.description && (
-                        <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: 2 }}>{selectedGroup.description}</div>
+                        <div className="permissions-selected-group-description">{selectedGroup.description}</div>
                       )}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{
-                        padding: '4px 12px', borderRadius: 20,
-                        background: 'var(--color-primary)', color: '#fff',
-                        fontSize: '0.8rem', fontWeight: 700,
-                      }}>
+                    <div className="permissions-detail-header-actions">
+                      <span className="permissions-count-badge">
                         {selectedGroup.permissions.length} quyền
                       </span>
                       {canManage && (
@@ -485,8 +466,8 @@ export default function Permissions() {
                   </div>
 
                   {/* Matrix table */}
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <div className="permissions-matrix-scroll">
+                    <table className="permissions-matrix-table">
                       <thead>
                         <tr style={{ background: 'var(--color-surface-2)' }}>
                           <th style={{ padding: '12px 20px', textAlign: 'left', fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--color-border)', width: 200 }}>

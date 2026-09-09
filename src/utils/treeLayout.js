@@ -7,10 +7,10 @@
 
 const NODE_WIDTH = 160;
 const NODE_HEIGHT = 150;   // tăng nhẹ để chứa avatar to hơn
-const H_SPACING = 40;      // Khoảng cách ngang giữa các node (không cùng cặp chính)
-const BRANCH_GAP = 100;    // Khoảng hở lớn hơn giữa 2 nhánh khác nhau (con của 2 cặp cha/mẹ khác nhau ở cùng 1 đời)
-const V_SPACING = 80;      // Khoảng cách dọc giữa các thế hệ
-const RING_GAP = 30;       // Khoảng hở giữa 2 nửa của thẻ vợ chồng gộp chung (chỗ đặt icon nhẫn)
+const H_SPACING = 34;      // khoảng cách ngang hợp lý hơn, tránh cây giãn quá chênh
+const BRANCH_GAP = 92;    // khoảng hở lớn hơn giữa 2 nhánh khác nhau, tạo đối xứng rõ hơn
+const V_SPACING = 80;      // khoảng cách dọc giữa các thế hệ
+const RING_GAP = 30;       // khoảng hở giữa 2 nửa của thẻ vợ chồng gộp chung (chỗ đặt icon nhẫn)
 const AVATAR_RADIUS = 32;  // bán kính avatar trong thẻ (trước đây 25)
 
 // Kích thước thẻ ở chế độ tối giản (chỉ hiện tên) — nhỏ hơn nhiều so với thẻ đầy đủ có avatar.
@@ -332,6 +332,24 @@ export function computeTreeLayout(members, relationships, options = {}) {
       const left = Math.min(first.x, second.x);
       first.x = left;
       second.x = left + widthOf(personId) + gap;
+    }
+  }
+
+  // Căn giữa toàn bộ cấu trúc cây sau khi đã ghép cặp vợ chồng / nhánh, nhằm giữ cây
+  // không lệch trái-phải và nhìn cân đối hơn khi vẽ lên SVG.
+  const positioned = safeMembers.map(member => ({
+    member,
+    pos: positionMap.get(member.id),
+    width: widthOf(member.id),
+  })).filter(item => item.pos);
+  if (positioned.length > 0) {
+    const left = Math.min(...positioned.map(item => item.pos.x));
+    const right = Math.max(...positioned.map(item => item.pos.x + item.width));
+    const center = (left + right) / 2;
+    const desiredCenter = 0;
+    const offset = desiredCenter - center;
+    for (const item of positioned) {
+      item.pos.x += offset;
     }
   }
 
