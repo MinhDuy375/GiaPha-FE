@@ -5,6 +5,7 @@ const FamilyTreeContext = createContext(null);
 
 export const FamilyTreeProvider = ({ children }) => {
   const [currentTreeId, setCurrentTreeId] = useState(null);
+  const [currentTreeName, setCurrentTreeName] = useState(null);
   const [role, setRole] = useState(null);
   const [permissions, setPermissions] = useState([]);
 
@@ -12,14 +13,16 @@ export const FamilyTreeProvider = ({ children }) => {
     const treeId = localStorage.getItem('currentFamilyTreeId');
     if (treeId) {
       setCurrentTreeId(treeId);
+      setCurrentTreeName(localStorage.getItem('currentFamilyTreeName'));
       setRole(authService.getRole());
       setPermissions(authService.getPermissions());
     }
   }, []);
 
-  const selectTree = async (treeId) => {
-    const data = await authService.selectTree(treeId);
+  const selectTree = async (treeId, treeName) => {
+    const data = await authService.selectTree(treeId, treeName);
     setCurrentTreeId(treeId);
+    if (treeName) setCurrentTreeName(treeName);
     setRole(data.role);
     setPermissions(data.permissions);
     return data;
@@ -31,15 +34,18 @@ export const FamilyTreeProvider = ({ children }) => {
 
   const clearSelectedTree = () => {
     localStorage.removeItem('currentFamilyTreeId');
+    localStorage.removeItem('currentFamilyTreeName');
     localStorage.removeItem('role');
     localStorage.removeItem('permissions');
     setCurrentTreeId(null);
+    setCurrentTreeName(null);
     setRole(null);
     setPermissions([]);
   };
 
   const value = {
     currentTreeId,
+    currentTreeName,
     role,
     permissions,
     selectTree,
