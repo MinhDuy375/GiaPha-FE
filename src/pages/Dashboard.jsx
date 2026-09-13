@@ -1,82 +1,79 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useFamilyTree } from "../contexts/FamilyTreeContext";
 import Navbar from "../components/Navbar";
 import eventService from "../services/eventService";
+import roleGroupService from "../services/roleGroupService";
 import { formatLunarDate } from "../utils/lunarCalendar";
 
-const IconFamily = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
-);
-const IconTree = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 22V12M12 12 5 7M12 12l7-5M5 7V4M19 7V4" />
-  </svg>
-);
-const IconDownload = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-  </svg>
-);
-const IconCheck = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12" />
-  </svg>
-);
-const IconUsers = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
-);
-const IconSettings = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="3" /><path d="M19.07 4.93A10 10 0 1 0 4.93 19.07 10 10 0 0 0 19.07 4.93" />
-  </svg>
-);
-const IconShield = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+const IconCalendar = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16, color: 'var(--color-primary)' }}>
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>
   </svg>
 );
 
-const features = [
-  { icon: <IconTree />, iconClass: "", title: "Cây Gia Phả", desc: "Xem sơ đồ phát đồ trực quan theo từng thế hệ. Phóng to, thu nhỏ và tương tác trực tiếp trên cây.", perm: "tree_view.view", to: "/family-tree" },
-  { icon: <IconFamily />, iconClass: "", title: "Quản lý Thành Viên", desc: "Thêm, sửa, xóa thông tin cá nhân: tiểu sử, ngày sinh, nghề nghiệp, hình ảnh.", perm: "member_list.view", to: "/members" },
-  { icon: <IconUsers />, iconClass: "feature-icon--amber", title: "Quản lý Quan hệ", desc: "Quản lý quan hệ cha mẹ, con nuôi và vợ chồng trong cây gia phả.", perm: "member_list.view", to: "/relationships" },
-  { icon: <IconTree />, iconClass: "feature-icon--teal", title: "Thống kê Dòng họ", desc: "Theo dõi số lượng thành viên, thế hệ, giới tính và phân bố năm sinh.", perm: "tree_view.view", to: "/statistics" },
-  { icon: <IconCheck />, iconClass: "feature-icon--amber", title: "Sự kiện Dòng họ", desc: "Theo dõi ngày giỗ, sinh nhật và các sự kiện quan trọng của dòng họ.", perm: "event.view", to: "/events" },
-  { icon: <IconUsers />, iconClass: "feature-icon--teal", title: "Tra cứu Danh xưng", desc: "Xác định cách xưng hô và liên kết giữa hai thành viên trong dòng tộc.", perm: "kinship.view", to: "/kinship" },
-  { icon: <IconFamily />, iconClass: "feature-icon--amber", title: "Thư viện Dòng họ", desc: "Lưu giữ ảnh, câu chuyện và ghi chú về những kỷ niệm của dòng họ.", perm: "gallery.view", to: "/gallery" },
-  { icon: <IconUsers />, iconClass: "feature-icon--teal", title: "Tham gia Gia tộc", desc: "Tham gia gia tộc bằng mã, quản lý các gia tộc của bạn và duyệt yêu cầu thành viên.", perm: "membership.view", to: "/membership" },
-  { icon: <IconDownload />, iconClass: "feature-icon--teal", title: "Nhập / Xuất Dữ liệu", desc: "Nhập hàng loạt từ Excel/GEDCOM hoặc xuất gia phả ra PDF / hình ảnh chất lượng cao.", perm: "tree_view.export", to: "/import-export" },
-  { icon: <IconCheck />, iconClass: "feature-icon--teal", title: "Phê Duyệt Đóng Góp", desc: "Xem xét và duyệt các đề xuất bổ sung, sửa đổi từ con cháu trước khi cập nhật chính thức.", perm: "membership.manage", to: null },
-  { icon: <IconShield />, iconClass: "feature-icon--amber", title: "Quản lý Người dùng", desc: "Xem danh sách, đổi vai trò, khóa/mở khóa và quản lý tài khoản trong dòng họ.", perm: "user.view", to: "/users" },
-  { icon: <IconSettings />, iconClass: "feature-icon--amber", title: "Phân Quyền & Cài đặt", desc: "Cấu hình các nhóm quyền và ma trận phân quyền chuyên nghiệp cho dòng họ.", perm: "role_group.view", to: "/permissions" },
-];
+const menuRoutes = {
+  tree_view: '/family-tree',
+  member_list: '/members',
+  kinship: '/kinship',
+  gallery: '/gallery',
+  events: '/events',
+  membership: '/membership',
+  role_group: '/permissions',
+  relationships: '/relationships',
+  statistics: '/statistics',
+  user: '/users'
+};
+
+const featureMeta = {
+  tree_view: { desc: "Xem sơ đồ phát đồ trực quan theo từng thế hệ.", colorClass: "" },
+  member_list: { desc: "Thêm, sửa, xóa thông tin cá nhân: tiểu sử, ngày sinh, nghề nghiệp, hình ảnh.", colorClass: "" },
+  relationships: { desc: "Quản lý quan hệ cha mẹ, con nuôi và vợ chồng trong cây.", colorClass: "feature-icon--amber" },
+  statistics: { desc: "Theo dõi số lượng thành viên, thế hệ, giới tính và năm sinh.", colorClass: "feature-icon--teal" },
+  events: { desc: "Theo dõi ngày giỗ, sinh nhật và các sự kiện quan trọng.", colorClass: "feature-icon--amber" },
+  kinship: { desc: "Xác định cách xưng hô và liên kết giữa hai thành viên.", colorClass: "feature-icon--teal" },
+  gallery: { desc: "Lưu giữ ảnh, câu chuyện và ghi chú về những kỷ niệm.", colorClass: "feature-icon--amber" },
+  membership: { desc: "Tham gia gia tộc bằng mã, duyệt yêu cầu thành viên.", colorClass: "feature-icon--teal" },
+  user: { desc: "Xem danh sách, đổi vai trò, khóa/mở khóa tài khoản.", colorClass: "feature-icon--amber" },
+  role_group: { desc: "Cấu hình các nhóm quyền và ma trận phân quyền.", colorClass: "feature-icon--amber" },
+};
+
+function MenuIcon({ name }) {
+  const paths = {
+    tree: 'M12 22V12M12 12 5 7M12 12l7-5M5 7V4M19 7V4',
+    users: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+    shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+    calendar: 'M4 5h16v15H4zM8 3v4M16 3v4M4 10h16',
+    link: 'M10 13a5 5 0 0 0 7.07.07l2-2a5 5 0 0 0-7.07-7.07L11 5M14 11a5 5 0 0 0-7.07-.07l-2 2A5 5 0 0 0 12 20l1-1',
+    images: 'M4 5h16v14H4zM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4M4 16l4-4 3 3 2-2 7 6',
+    'user-plus': 'M15 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M19 8v6M16 11h6',
+    chart: 'M4 19V5M4 19h16M8 16v-4M12 16V8M16 16V4',
+    switch: 'M16 3l4 4-4 4M20 7H10M8 21l-4-4 4-4M4 17h10',
+  };
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name] || paths.tree} /></svg>;
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { role, permissions, selectTree } = useFamilyTree();
   const navigate = useNavigate();
-  const [events, setEvents] = React.useState([]);
+  const [events, setEvents] = useState([]);
+  const [navigation, setNavigation] = useState([]);
 
   const has = (perm) => permissions?.includes(perm);
 
-  const roleChipClass = role === 'Quản trị viên' ? 'chip chip-primary' : role === 'Người biên tập' ? 'chip chip-amber' : 'chip chip-green';
-
-  // Tự động refresh permissions khi mount
-  React.useEffect(() => {
+  useEffect(() => {
     const treeId = localStorage.getItem('currentFamilyTreeId');
     const treeName = localStorage.getItem('currentFamilyTreeName');
     if (treeId) selectTree(treeId, treeName).catch(() => { });
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
+    roleGroupService.getNavigation().then(setNavigation).catch(() => setNavigation([]));
+  }, []);
+
+  useEffect(() => {
     if (!has('event.view')) return;
     eventService.getEvents().then(setEvents).catch(() => setEvents([]));
   }, [permissions]);
@@ -97,32 +94,49 @@ export default function Dashboard() {
           </div>
           <div className="card dashboard-event-card">
             <div className="dashboard-label">Sự kiện hôm nay và sắp tới</div>
-            {upcomingEvents.length ? upcomingEvents.map(event => <div key={event.id} className="dashboard-event-row"><span className="dashboard-event-title">{event.title}</span><span className="dashboard-event-meta">{new Date(event.eventDate).toLocaleDateString('vi-VN')}<br /><small>Âm: {formatLunarDate(event.eventDate)}</small></span></div>) : <div className="dashboard-empty-event">Chưa có sự kiện sắp tới.</div>}
+            {upcomingEvents.length ? upcomingEvents.map(event => (
+              <div key={event.id} className="dashboard-event-row" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px dashed var(--color-border)' }}>
+                <div style={{ padding: 8, background: 'var(--color-primary-bg)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <IconCalendar />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="dashboard-event-title" style={{ fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 2 }}>{event.title}</div>
+                  <div className="dashboard-event-meta" style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                    {new Date(event.eventDate).toLocaleDateString('vi-VN')} · Âm lịch: {formatLunarDate(event.eventDate)}
+                  </div>
+                </div>
+              </div>
+            )) : <div className="dashboard-empty-event">Chưa có sự kiện sắp tới.</div>}
           </div>
         </div>
 
         <div className="section-header">
           <h2 className="section-title">Tính năng hệ thống</h2>
-          <p className="section-sub">Các chức năng được phân quyền theo vai trò của bạn trong dòng họ.</p>
+          <p className="section-sub">Các chức năng được cấu hình theo luồng nghiệp vụ.</p>
         </div>
         <div className="dashboard-feature-grid">
-          {features.map((feat) => {
-            const allowed = has(feat.perm);
+          {navigation.map((menu) => {
+            const allowed = menu.permissions?.some(p => permissions?.includes(p));
+            const to = menuRoutes[menu.alias];
+            const meta = featureMeta[menu.alias] || { desc: "Chức năng dòng họ", colorClass: "" };
+            
             return (
               <div
-                key={`${feat.perm}-${feat.to || feat.title}`}
-                className={"feature-card" + (allowed ? "" : " feature-card--disabled")}
-                role={allowed && feat.to ? "button" : undefined}
-                tabIndex={allowed && feat.to ? 0 : undefined}
-                onClick={() => allowed && feat.to && navigate(feat.to)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && allowed && feat.to) navigate(feat.to); }}
-                style={{ cursor: allowed && feat.to ? 'pointer' : 'default' }}
+                key={menu.id}
+                className={"feature-card" + (allowed && to ? "" : " feature-card--disabled")}
+                role={allowed && to ? "button" : undefined}
+                tabIndex={allowed && to ? 0 : undefined}
+                onClick={() => allowed && to && navigate(to)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && allowed && to) navigate(to); }}
+                style={{ cursor: allowed && to ? 'pointer' : 'default' }}
               >
-                <div className={"feature-icon " + feat.iconClass} aria-hidden="true">{feat.icon}</div>
-                <h3 className="feature-title">{feat.title}</h3>
-                <p className="feature-desc">{feat.desc}</p>
-                <div className={allowed ? 'feature-access-open' : 'feature-access-denied'}>
-                  {allowed ? `Mở ${feat.title} →` : "Không đủ quyền"}
+                <div className={"feature-icon " + meta.colorClass} aria-hidden="true">
+                  <MenuIcon name={menu.icon} />
+                </div>
+                <h3 className="feature-title">{menu.name}</h3>
+                <p className="feature-desc">{meta.desc}</p>
+                <div className={allowed && to ? 'feature-access-open' : 'feature-access-denied'}>
+                  {allowed && to ? `Mở ${menu.name} →` : "Không đủ quyền"}
                 </div>
               </div>
             );

@@ -3,7 +3,10 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import memberService from '../services/memberService';
 import Navbar from '../components/Navbar';
-import { computeTreeLayout, filterTreeData, GENDER_COLORS, NODE_WIDTH, NODE_HEIGHT, AVATAR_RADIUS, RING_GAP } from '../utils/treeLayout';
+import { GENDER_COLORS } from '../utils/treeLayout';
+import RecursiveTree from '../components/RecursiveTree';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { API_ORIGIN } from '../services/api';
 import { useFamilyTree } from '../contexts/FamilyTreeContext';
 import membershipService from '../services/membershipService';
@@ -43,6 +46,13 @@ const IconTree = () => (
 const IconChevronDown = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>
+);
+const IconExport = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
   </svg>
 );
 
@@ -543,10 +553,10 @@ export default function FamilyTree() {
   const navigate = useNavigate();
   const { hasPermission } = useFamilyTree();
   const [searchParams] = useSearchParams();
-  const svgRef = useRef(null);
+  const exportRef = useRef(null);
 
   const [treeData, setTreeData] = useState({ members: [], relationships: [] });
-  const [layout, setLayout] = useState({ nodes: [], edges: [] });
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedNode, setSelectedNode] = useState(null);
@@ -563,7 +573,7 @@ export default function FamilyTree() {
   const [toast, setToast] = useState(null);
   const [viewBox, setViewBox] = useState({ x: -400, y: -100, w: 1200, h: 700 });
   const [treeZoom, setTreeZoom] = useState(1);
-  const [treePan, setTreePan] = useState({ x: 0, y: 0 });
+
   const dragRef = useRef(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
@@ -580,10 +590,6 @@ export default function FamilyTree() {
   const filtersRef = useRef(filters);
   useEffect(() => { filtersRef.current = filters; }, [filters]);
 
-  const buildLayout = useCallback((data, activeFilters) => {
-    const filtered = filterTreeData(data.members, data.relationships, activeFilters);
-    return computeTreeLayout(filtered.members, filtered.relationships, { minimal: activeFilters.minimalView });
-  }, []);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -597,36 +603,19 @@ export default function FamilyTree() {
       const data = await memberService.getTreeData();
       const normalizedData = {
         members: Array.isArray(data?.members) ? data.members.filter(Boolean) : [],
-        relationships: Array.isArray(data?.relationships) ? data.relationships.filter(Boolean) : []
+        relationships: Array.isArray(data?.relationships) ? data.relationships.filter(Boolean) : [],
       };
       setTreeData(normalizedData);
-      const computed = buildLayout(normalizedData, filtersRef.current);
-      setLayout(computed);
-      return computed;
+      return normalizedData;
     } catch (e) {
-      setError('Không thể tải dữ liệu cây gia phả. ' + (e.response?.data?.message || ''));
+      setError(e.response?.data?.message || 'Kh�ng th? t?i d? li?u.');
     } finally {
       setLoading(false);
     }
-  }, [buildLayout]);
+  }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  useEffect(() => {
-    setLayout(buildLayout(treeData, filters));
-  }, [filters]);
-
-  useEffect(() => {
-    if (layout.nodes.length === 0) return;
-    const rights = layout.nodes.map(n => n.x + (n.isCoupleLead ? n.coupleWidth : (n.width || NODE_WIDTH)));
-    const minX = Math.min(...layout.nodes.map(n => n.x)) - 80;
-    const minY = Math.min(...layout.nodes.map(n => n.y)) - 80;
-    const maxX = Math.max(...rights) + 80;
-    const maxY = Math.max(...layout.nodes.map(n => n.y + (n.height || NODE_HEIGHT))) + 80;
-    setViewBox({ x: minX, y: minY, w: maxX - minX, h: maxY - minY });
-    setTreeZoom(1);
-    setTreePan({ x: 0, y: 0 });
-  }, [layout.nodes]);
 
   useEffect(() => {
     if (searchParams.get('action') === 'create' && !loading) {
@@ -729,109 +718,51 @@ export default function FamilyTree() {
     else setKinship(null);
   }, [kinshipFrom, kinshipTo]);
 
-  const changeTreeZoom = (amount) => {
-    setTreeZoom(value => Math.min(2.5, Math.max(0.55, Number((value + amount).toFixed(2)))));
+  const exportTreePng = async () => {
+    if (!exportRef.current) return;
+    try {
+      const canvas = await html2canvas(exportRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#FAF7F1'
+      });
+      const link = document.createElement('a');
+      link.download = 'cay-gia-pha.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (err) {
+      console.error(err);
+      showToast('Kh�ng th? xu?t PNG.', 'error');
+    }
   };
 
-  const handleTreeMouseDown = (event) => {
-    if (event.button !== 0) return;
-    dragRef.current = { clientX: event.clientX, clientY: event.clientY };
+  const exportTreePdf = async () => {
+    if (!exportRef.current) return;
+    try {
+      const canvas = await html2canvas(exportRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#FAF7F1'
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save('cay-gia-pha.pdf');
+    } catch (err) {
+      console.error(err);
+      showToast('Kh�ng th? xu?t PDF.', 'error');
+    }
   };
 
-  const handleTreeMouseMove = (event) => {
-    const drag = dragRef.current;
-    if (!drag) return;
-    const scaleX = viewBox.w / event.currentTarget.clientWidth / treeZoom;
-    const scaleY = viewBox.h / event.currentTarget.clientHeight / treeZoom;
-    setTreePan(pan => ({
-      x: pan.x - (event.clientX - drag.clientX) * scaleX,
-      y: pan.y - (event.clientY - drag.clientY) * scaleY
-    }));
-    dragRef.current = { clientX: event.clientX, clientY: event.clientY };
-  };
-
-  const COLOR_ATTRS = ['fill', 'stroke', 'stop-color'];
-  const inlineResolvedColors = (liveRoot, cloneRoot) => {
-    const liveEls = liveRoot.querySelectorAll('*');
-    const cloneEls = cloneRoot.querySelectorAll('*');
-    const resolveNode = (liveEl, cloneEl) => {
-      const computed = window.getComputedStyle(liveEl);
-      for (const attr of COLOR_ATTRS) {
-        const raw = liveEl.getAttribute(attr);
-        if (raw && raw.includes('var(')) {
-          const cssProp = attr === 'stop-color' ? 'stop-color' : attr;
-          const resolved = computed.getPropertyValue(cssProp) || computed[attr];
-          if (resolved) cloneEl.setAttribute(attr, resolved.trim());
-        }
-      }
-      if (liveEl.style && liveEl.style.cssText && liveEl.style.cssText.includes('var(')) {
-        const style = liveEl.style;
-        for (let i = 0; i < style.length; i++) {
-          const prop = style[i];
-          if (style.getPropertyValue(prop).includes('var(')) {
-            const resolvedValue = computed.getPropertyValue(prop);
-            if (resolvedValue) cloneEl.style.setProperty(prop, resolvedValue.trim());
-          }
-        }
-      }
-    };
-    resolveNode(liveRoot, cloneRoot);
-    liveEls.forEach((liveEl, index) => {
-      const cloneEl = cloneEls[index];
-      if (cloneEl) resolveNode(liveEl, cloneEl);
-    });
-  };
-
-  const buildExportSvg = () => {
-    if (!svgRef.current) return null;
-    const clone = svgRef.current.cloneNode(true);
-    inlineResolvedColors(svgRef.current, clone);
-    const bg = '#FAF7F1';
-    clone.style.background = bg;
-    clone.setAttribute('style', (clone.getAttribute('style') || '') + `;background:${bg};`);
-    return clone;
-  };
-
-  const exportTreePng = () => {
-    const clone = buildExportSvg();
-    if (!clone) return;
-    const bbox = svgRef.current.getBBox ? svgRef.current.getBBox() : null;
-    const width = clone.viewBox.baseVal?.width || bbox?.width || 1600;
-    const height = clone.viewBox.baseVal?.height || bbox?.height || 900;
-    clone.setAttribute('width', width);
-    clone.setAttribute('height', height);
-    const svgString = new XMLSerializer().serializeToString(clone);
-    const image = new Image();
-    image.onload = () => {
-      const scale = 2;
-      const canvas = document.createElement('canvas');
-      canvas.width = width * scale; canvas.height = height * scale;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#FAF7F1';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-      const link = document.createElement('a'); link.download = 'cay-gia-pha.png'; link.href = canvas.toDataURL('image/png'); link.click();
-    };
-    image.onerror = () => showToast('Không thể xuất PNG.', 'error');
-    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgString)}`;
-  };
-
-  const exportTreePdf = () => {
-    const clone = buildExportSvg();
-    if (!clone) return;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    printWindow.document.write(`<html><head><title>Cây gia phả</title><style>html,body{margin:0;background:#FAF7F1;}</style></head><body>${clone.outerHTML}</body></html>`);
-    printWindow.document.close(); printWindow.focus();
-    printWindow.onload = () => printWindow.print();
-    setTimeout(() => printWindow.print(), 300);
-  };
-
-  const filteredNodes = layout.nodes.filter(n =>
+  const filteredNodes = treeData.members.filter(n =>
     !searchTerm || n.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
   const filteredIds = new Set(filteredNodes.map(n => n.id));
-  const nodeById = new Map(layout.nodes.map(node => [String(node.id), node]));
+  const nodeById = new Map(treeData.members.map(node => [String(node.id), node]));
   const selectNodeById = (id) => setSelectedNode(nodeById.get(String(id)) || nodeById.get(id) || null);
 
   const selectedRelations = treeData.relationships.filter(relation => relation.person_a === selectedNode?.id || relation.person_b === selectedNode?.id);
@@ -917,6 +848,15 @@ export default function FamilyTree() {
           border-color: #B84D20;
           color: #B84D20;
         }
+        /* Biến thể icon + nhãn chữ: bỏ width cố định 42px để chữ không tràn ra ngoài */
+        .ft-btn-icon-label {
+          width: auto;
+          min-width: auto;
+          padding: 0 14px;
+          gap: 6px;
+          flex-shrink: 0;
+          white-space: nowrap;
+        }
         .ft-btn-secondary {
           height: 42px;
           min-height: 42px;
@@ -978,6 +918,10 @@ export default function FamilyTree() {
           box-shadow: 0 4px 20px rgba(43, 33, 27, 0.05);
           display: flex;
           gap: 12px;
+          position: relative;
+        }
+        .ft-dropdown-anchor {
+          position: relative;
         }
         .ft-toolbar-row {
           display: flex;
@@ -1007,12 +951,59 @@ export default function FamilyTree() {
           }
           .ft-toolbar-card {
             max-width: 480px;
-            flex-direction: column;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            align-items: center;
+            justify-content: space-between;
             border-radius: 18px;
-            padding: 12px;
+            padding: 10px 12px;
+            gap: 8px;
+            /* Không dùng overflow-x: auto ở đây vì sẽ cắt mất dropdown Lọc/Xuất */
+            overflow: visible;
           }
+          /* Gộp 2 cụm nút thành 1 hàng duy nhất trên mobile */
           .ft-toolbar-row {
-            width: 100%;
+            width: auto;
+            display: contents;
+          }
+          .ft-toolbar-row > * {
+            flex-shrink: 0;
+          }
+          .ft-segmented-control {
+            flex: 0 0 auto;
+            padding: 3px;
+          }
+          /* Trên mobile chỉ hiện icon cho tất cả các nút trong toolbar để đủ chỗ 1 hàng */
+          .ft-btn-label,
+          .ft-segment-label {
+            display: none;
+          }
+          .ft-segment-btn {
+            flex: 0 0 auto;
+            width: 38px;
+            padding: 0;
+          }
+          .ft-btn-icon-label {
+            width: 42px;
+            min-width: 42px;
+            padding: 0;
+          }
+          .ft-toolbar-row .ft-btn-primary {
+            width: 42px;
+            min-width: 42px;
+            padding: 0;
+          }
+          /* Dropdown Lọc/Xuất: neo theo cả thẻ toolbar thay vì nút nhỏ, tránh tràn ra ngoài màn hình */
+          .ft-dropdown-anchor {
+            position: static;
+          }
+          .ft-toolbar-card .ft-filter-panel,
+          .ft-toolbar-card .ft-export-panel,
+          .ft-toolbar-card .ft-export-panel--right {
+            left: 12px;
+            right: 12px;
+            width: auto;
+            min-width: 0;
           }
         }
 
@@ -1091,31 +1082,28 @@ export default function FamilyTree() {
           border-radius: 12px;
           box-shadow: 0 12px 32px rgba(43, 33, 27, 0.12);
         }
+        .ft-export-panel--right {
+          left: auto;
+          right: 0;
+        }
       `}</style>
 
       {/* ─── TOOLBAR CARD ─── */}
       <div className="ft-toolbar-wrapper">
         <div className="ft-toolbar-card">
-          {/* Cụm 1: Nút Mở danh sách | Phóng to - Thu nhỏ | Bộ lọc */}
+          {/* Cụm 1: Nút Mở danh sách | Bộ lọc */}
           <div className="ft-toolbar-row">
-            <button className="ft-btn-icon" onClick={() => setLeftPanelOpen(v => !v)} title="Danh sách & tra danh xưng">
+            <button className="ft-btn-icon ft-btn-icon-label" onClick={() => setLeftPanelOpen(v => !v)} title="Danh sách & tra danh xưng"
+              style={{ display: 'flex', alignItems: 'center' }}>
               <IconList />
+              <span className="ft-btn-label">Danh sách</span>
             </button>
 
-            <div className="ft-zoom-container">
-              <button className="ft-btn-icon" style={{ height: 34, width: 34, minWidth: 34, minHeight: 34, border: 'none', background: '#FFFFFF' }} title="Thu nhỏ" onClick={() => changeTreeZoom(-0.1)}>
-                <IconMinus />
-              </button>
-              <span className="ft-zoom-text">{Math.round(treeZoom * 100)}%</span>
-              <button className="ft-btn-icon" style={{ height: 34, width: 34, minWidth: 34, minHeight: 34, border: 'none', background: '#FFFFFF' }} title="Phóng to" onClick={() => changeTreeZoom(0.1)}>
-                <IconPlus />
-              </button>
-            </div>
-
-            <div style={{ position: 'relative' }}>
-              <button className="ft-btn-primary" style={{ height: 42, width: 42, padding: 0 }} onClick={() => setFilterOpen(v => !v)} title="Bộ lọc">
+            <div className="ft-dropdown-anchor">
+              <button className="ft-btn-primary" style={{ height: 42, padding: '0 14px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setFilterOpen(v => !v)} title="Bộ lọc">
                 <IconFilter />
-                {activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+                <span className="ft-btn-label">Lọc</span>
+                {activeFilterCount > 0 ? <span style={{ background: '#B84D20', color: '#fff', borderRadius: 8, fontSize: 11, padding: '1px 5px', fontWeight: 700 }}>{activeFilterCount}</span> : ''}
               </button>
 
               {filterOpen && (
@@ -1182,103 +1170,133 @@ export default function FamilyTree() {
             </div>
           </div>
 
-          {/* Cụm 2: Nút Xuất file | Switch Cây - Danh sách | Nút Thêm mới */}
+          {/* Cụm 2: Switch Cây - Danh sách | Nút Xuất | Nút Thêm mới */}
           <div className="ft-toolbar-row">
-            <div style={{ position: 'relative' }}>
-              <button className="ft-btn-icon" disabled={!hasPermission('tree_view.export')} onClick={() => setExportOpen(v => !v)} title="Xuất cây gia phả">
-                <IconChevronDown />
+            <div className="ft-segmented-control" style={{ flex: 1 }}>
+              <button className="ft-segment-btn active">
+                <IconTree /> <span className="ft-segment-label">Cây</span>
+              </button>
+              <button className="ft-segment-btn inactive" onClick={() => navigate('/members')} title="Danh sách">
+                <IconList /> <span className="ft-segment-label">Danh sách</span>
+              </button>
+            </div>
+
+            <button className="ft-btn-primary" style={{ height: 42, padding: '0 14px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }} onClick={() => { returnToDetailIdRef.current = null; setEditingMember(null); setModalOpen(true); }} title="Thêm thành viên">
+              <IconPlus />
+              <span className="ft-btn-label">Thêm</span>
+            </button>
+
+            <div className="ft-dropdown-anchor">
+              <button className="ft-btn-icon ft-btn-icon-label" disabled={!hasPermission('tree_view.export')} onClick={() => setExportOpen(v => !v)} title="Xuất cây gia phả"
+                style={{ display: 'flex', alignItems: 'center' }}>
+                <IconExport />
+                <span className="ft-btn-label">Xuất</span>
               </button>
               {exportOpen && (
-                <div className="ft-export-panel">
+                <div className="ft-export-panel ft-export-panel--right">
                   <button className="ft-btn-secondary" style={{ width: '100%', height: 36, border: 'none', justifyContent: 'flex-start' }} onClick={() => { setExportOpen(false); exportTreePng(); }}>Tải ảnh PNG</button>
                   <button className="ft-btn-secondary" style={{ width: '100%', height: 36, border: 'none', justifyContent: 'flex-start' }} onClick={() => { setExportOpen(false); exportTreePdf(); }}>Xuất PDF</button>
                 </div>
               )}
             </div>
-
-            <div className="ft-segmented-control" style={{ flex: 1 }}>
-              <button className="ft-segment-btn active">
-                <IconTree /> Cây
-              </button>
-              <button className="ft-segment-btn inactive" onClick={() => navigate('/members')}>
-                <IconList /> Danh sách
-              </button>
-            </div>
-
-            <button className="ft-btn-icon" onClick={() => { returnToDetailIdRef.current = null; setEditingMember(null); setModalOpen(true); }} title="Thêm thành viên">
-              <IconPlus />
-            </button>
           </div>
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="family-tree-main-content" style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
-        {/* Left Side Panel (Search & Kinship) */}
-        <div style={{ position: 'absolute', zIndex: 20, top: 12, left: 20, bottom: 20, width: 310, opacity: leftPanelOpen ? 1 : 0, pointerEvents: leftPanelOpen ? 'auto' : 'none', background: '#FFFFFF', border: '1px solid #E7DED4', borderRadius: 16, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 12px 36px rgba(43,33,27,0.12)', transition: 'opacity 200ms ease, transform 200ms ease', transform: leftPanelOpen ? 'translateX(0)' : 'translateX(-12px)' }}>
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid #E7DED4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <strong style={{ color: '#2B211B' }}>Thành viên & Tra danh xưng</strong>
-            <button onClick={() => setLeftPanelOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#756A61', fontSize: '1.1rem' }}>✕</button>
-          </div>
-          
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid #E7DED4' }}>
-            <div style={{ position: 'relative' }}>
-              <div style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#756A61' }}><IconSearch /></div>
-              <input
-                style={{ width: '100%', height: 38, paddingLeft: 34, paddingRight: 10, background: '#FAF7F1', border: '1px solid #E7DED4', borderRadius: 10, fontSize: '0.875rem', color: '#2B211B', outline: 'none', boxSizing: 'border-box' }}
-                placeholder="Tìm tên thành viên..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-              />
+      {/* Modal: Danh sách thành viên & Tra danh xưng */}
+      {leftPanelOpen && createPortal(
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(43,33,27,0.35)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16
+        }} onClick={e => { if (e.target === e.currentTarget) setLeftPanelOpen(false); }}>
+          <div style={{
+            background: '#FFFFFF', borderRadius: 20,
+            boxShadow: '0 24px 64px rgba(43,33,27,0.22)',
+            width: '100%', maxWidth: 560, maxHeight: '85vh',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            animation: 'modal-in 0.2s ease'
+          }}>
+            {/* Header */}
+            <div style={{ padding: '18px 22px', borderBottom: '1px solid #E7DED4', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <strong style={{ color: '#2B211B', fontSize: '1rem' }}>Thành viên & Tra danh xưng</strong>
+              <button onClick={() => setLeftPanelOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#756A61', fontSize: '1.3rem', lineHeight: 1 }}>✕</button>
+            </div>
+
+            {/* Search */}
+            <div style={{ padding: '12px 18px', borderBottom: '1px solid #E7DED4', flexShrink: 0 }}>
+              <div style={{ position: 'relative' }}>
+                <div style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#756A61' }}><IconSearch /></div>
+                <input
+                  style={{ width: '100%', height: 40, paddingLeft: 36, paddingRight: 10, background: '#FAF7F1', border: '1px solid #E7DED4', borderRadius: 10, fontSize: '0.875rem', color: '#2B211B', outline: 'none', boxSizing: 'border-box' }}
+                  placeholder="Tìm tên thành viên..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Member list */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px' }}>
+              {filteredNodes.map(n => {
+                const colors = GENDER_COLORS[n.gender] || GENDER_COLORS.other;
+                return (
+                  <div key={n.id}
+                    onClick={() => { setSelectedNode(n); setLeftPanelOpen(false); }}
+                    style={{
+                      padding: '10px 12px', borderRadius: 12, cursor: 'pointer', marginBottom: 4,
+                      background: selectedNode?.id === n.id ? '#FEF3ED' : 'transparent',
+                      border: `1px solid ${selectedNode?.id === n.id ? '#B84D20' : 'transparent'}`,
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      transition: 'all 0.14s ease',
+                    }}
+                  >
+                    <div style={{ width: 34, height: 34, borderRadius: '50%', background: colors.bg, border: `1.5px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: colors.text, flexShrink: 0 }}>
+                      {n.full_name?.split(' ').slice(-1)[0]?.[0]?.toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#2B211B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.full_name}</div>
+                      <div style={{ fontSize: '0.76rem', color: '#756A61' }}>Đời {n.generation || 1} · {n.gender === 'male' ? 'Nam' : n.gender === 'female' ? 'Nữ' : 'Khác'}</div>
+                    </div>
+                  </div>
+                );
+              })}
+              {filteredNodes.length === 0 && (
+                <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '32px 16px', fontSize: '0.875rem' }}>Không tìm thấy thành viên.</div>
+              )}
+            </div>
+
+            {/* Kinship lookup section */}
+            <div style={{ padding: '16px 18px', borderTop: '1px solid #E7DED4', background: '#FAF7F1', flexShrink: 0 }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#756A61', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Tra danh xưng nhanh</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                <select style={{ width: '100%', height: 36, padding: '0 8px', background: '#FFFFFF', border: '1px solid #E7DED4', borderRadius: 8, fontSize: '0.83rem', color: '#2B211B' }}
+                  value={kinshipFrom} onChange={e => setKinshipFrom(e.target.value)}>
+                  <option value="">-- Người A --</option>
+                  {treeData.members.map(m => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+                </select>
+                <select style={{ width: '100%', height: 36, padding: '0 8px', background: '#FFFFFF', border: '1px solid #E7DED4', borderRadius: 8, fontSize: '0.83rem', color: '#2B211B' }}
+                  value={kinshipTo} onChange={e => setKinshipTo(e.target.value)}>
+                  <option value="">-- Người B --</option>
+                  {treeData.members.map(m => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+                </select>
+              </div>
+              {kinship && (
+                <div style={{ background: '#FFFFFF', border: '1px solid #E7DED4', borderRadius: 10, padding: '10px 12px', fontSize: '0.82rem' }}>
+                  <div style={{ fontWeight: 700, color: '#2B211B', marginBottom: 4 }}>{kinship.description}</div>
+                  <div style={{ color: '#756A61' }}>A gọi B: <strong style={{ color: '#B84D20' }}>{kinship.aCallsB}</strong></div>
+                  <div style={{ color: '#756A61' }}>B gọi A: <strong style={{ color: '#B84D20' }}>{kinship.bCallsA}</strong></div>
+                </div>
+              )}
             </div>
           </div>
+        </div>,
+        document.body
+      )}
 
-          <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
-            {filteredNodes.map(n => {
-              const colors = GENDER_COLORS[n.gender] || GENDER_COLORS.other;
-              return (
-                <div key={n.id}
-                  onClick={() => setSelectedNode(n)}
-                  style={{
-                    padding: '8px 10px', borderRadius: 10, cursor: 'pointer', marginBottom: 4,
-                    background: selectedNode?.id === n.id ? '#FAF7F1' : 'transparent',
-                    border: `1px solid ${selectedNode?.id === n.id ? '#B84D20' : 'transparent'}`,
-                    display: 'flex', alignItems: 'center', gap: 10,
-                  }}
-                >
-                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: colors.bg, border: `1.5px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: colors.text, flexShrink: 0 }}>
-                    {n.full_name?.split(' ').slice(-1)[0]?.[0]?.toUpperCase()}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#2B211B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.full_name}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#756A61' }}>Đời {n.generation || 1} · {n.gender === 'male' ? 'Nam' : n.gender === 'female' ? 'Nữ' : 'Khác'}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div style={{ padding: '12px 14px', borderTop: '1px solid #E7DED4', background: '#FAF7F1' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#756A61', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Tra danh xưng</div>
-            <select style={{ width: '100%', height: 36, padding: '0 8px', background: '#FFFFFF', border: '1px solid #E7DED4', borderRadius: 8, fontSize: '0.83rem', marginBottom: 6, color: '#2B211B' }}
-              value={kinshipFrom} onChange={e => setKinshipFrom(e.target.value)}>
-              <option value="">-- Người A --</option>
-              {treeData.members.map(m => <option key={m.id} value={m.id}>{m.full_name}</option>)}
-            </select>
-            <select style={{ width: '100%', height: 36, padding: '0 8px', background: '#FFFFFF', border: '1px solid #E7DED4', borderRadius: 8, fontSize: '0.83rem', marginBottom: 8, color: '#2B211B' }}
-              value={kinshipTo} onChange={e => setKinshipTo(e.target.value)}>
-              <option value="">-- Người B --</option>
-              {treeData.members.map(m => <option key={m.id} value={m.id}>{m.full_name}</option>)}
-            </select>
-            {kinship && (
-              <div style={{ marginTop: 8, background: '#FFFFFF', border: '1px solid #E7DED4', borderRadius: 10, padding: '10px 12px', fontSize: '0.82rem' }}>
-                <div style={{ fontWeight: 700, color: '#2B211B', marginBottom: 4 }}>{kinship.description}</div>
-                <div style={{ color: '#756A61' }}>A gọi B: <strong style={{ color: '#B84D20' }}>{kinship.aCallsB}</strong></div>
-                <div style={{ color: '#756A61' }}>B gọi A: <strong style={{ color: '#B84D20' }}>{kinship.bCallsA}</strong></div>
-              </div>
-            )}
-          </div>
-        </div>
+      {/* Main Content Area */}
+      <div className="family-tree-main-content" style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
 
         {/* Canvas Cây Gia Phả */}
         <div className="family-tree-canvas-region" style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -1290,117 +1308,37 @@ export default function FamilyTree() {
           )}
 
           {/* EMPTY STATE */}
-          {!loading && layout.nodes.length === 0 && (
+          {!loading && treeData.members.length === 0 && (
             <div style={{
               position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexDirection: 'column', textAlign: 'center', padding: '24px 16px', background: '#FAF7F1'
             }}>
-              <div style={{ fontSize: '3rem', marginBottom: 16 }}>🌿</div>
-              
+              <div style={{ fontSize: '3rem', marginBottom: 16 }}>🌳</div>
+
               <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#2B211B', margin: '0 0 8px 0' }}>
-                {treeData.members.length > 0 ? 'Không tìm thấy kết quả phù hợp' : 'Chưa có thành viên nào'}
+                Chưa có thành viên nào
               </h2>
 
               <p style={{ fontSize: '0.95rem', color: '#756A61', margin: '0 0 24px 0', maxWidth: 320, lineHeight: 1.5 }}>
-                {treeData.members.length > 0
-                  ? 'Hãy thử nới bớt bộ lọc đang áp dụng.'
-                  : 'Hãy thêm thành viên đầu tiên để xây dựng cây gia phả.'}
+                Hãy thêm thành viên đầu tiên để xây dựng cây gia phả.
               </p>
 
-              {treeData.members.length > 0 ? (
-                <button className="ft-btn-secondary" onClick={resetFilters}>
-                  <IconFilter /> Đặt lại bộ lọc
-                </button>
-              ) : (
-                <button className="ft-btn-primary" style={{ height: 48, borderRadius: 16, padding: '0 24px', fontSize: '0.95rem' }} onClick={() => { returnToDetailIdRef.current = null; setEditingMember(null); setModalOpen(true); }}>
-                  <IconPlus /> Thêm thành viên đầu tiên
-                </button>
-              )}
+              <button className="ft-btn-primary" style={{ height: 48, borderRadius: 16, padding: '0 24px', fontSize: '0.95rem' }} onClick={() => { returnToDetailIdRef.current = null; setEditingMember(null); setModalOpen(true); }}>
+                <IconPlus /> Thêm thành viên đầu tiên
+              </button>
             </div>
           )}
 
-          {!loading && error && (
-            <div style={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 3, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', padding: '12px 16px', borderRadius: 12, fontSize: '0.9rem' }}>
-              {error}
-            </div>
-          )}
-
-          {!loading && layout.nodes.length > 0 && (
-            <svg
-              ref={svgRef}
-              width="100%" height="100%"
-              style={{ minHeight: Math.max(700, viewBox.h), minWidth: Math.max(900, viewBox.w), background: '#FAF7F1', cursor: dragRef.current ? 'grabbing' : 'grab' }}
-              viewBox={`${viewBox.x + treePan.x + viewBox.w * (1 - 1 / treeZoom) / 2} ${viewBox.y + treePan.y + viewBox.h * (1 - 1 / treeZoom) / 2} ${viewBox.w / treeZoom} ${viewBox.h / treeZoom}`}
-              onMouseDown={handleTreeMouseDown}
-              onMouseMove={handleTreeMouseMove}
-              onMouseUp={() => { dragRef.current = null; }}
-              onMouseLeave={() => { dragRef.current = null; }}
-            >
-              <defs>
-                <style>{`
-                  .gp-card-half { cursor: pointer; transition: transform 200ms ease; }
-                  .gp-card-half:hover { transform: translateY(-4px); }
-                  .gp-card-rect { transition: filter 200ms ease, stroke 200ms ease; filter: drop-shadow(0 2px 6px rgba(43,33,27,0.06)); }
-                  .gp-card-half:hover .gp-card-rect { filter: drop-shadow(0 6px 16px rgba(43,33,27,0.12)); }
-                `}</style>
-                <pattern id="grid" width={60} height={60} patternUnits="userSpaceOnUse">
-                  <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#E7DED4" strokeWidth={0.6} opacity={0.5} />
-                </pattern>
-              </defs>
-              <rect x={viewBox.x} y={viewBox.y} width={viewBox.w} height={viewBox.h} fill="url(#grid)" />
-
-              {/* Edges */}
-              <g>
-                {layout.edges.map(edge => {
-                  const opacity = (!searchTerm || (filteredIds.has(edge.fromId) && filteredIds.has(edge.toId))) ? 1 : 0.1;
-                  if (edge.type === 'marriage') {
-                    return <g key={edge.id}>
-                      <path d={`M ${edge.x1} ${edge.y1} L ${edge.x2} ${edge.y2}`} fill="none" stroke={edgeColor(edge.type)} strokeWidth="2.5" opacity={opacity} />
-                      <text x={(edge.x1 + edge.x2) / 2} y={(edge.y1 + edge.y2) / 2 + 5} textAnchor="middle" fontSize="16" aria-label="Vợ chồng">💍</text>
-                    </g>;
-                  }
-                  const r = 10;
-                  const dir = edge.x2 >= edge.trunkX ? 1 : -1;
-                  const sameX = Math.abs(edge.x2 - edge.trunkX) < 0.5;
-
-                  let d = `M ${edge.parentX} ${edge.parentY} L ${edge.trunkX} ${edge.parentY} V ${edge.trunkY}`;
-                  if (!sameX) {
-                    d += ` Q ${edge.trunkX} ${edge.trunkY} ${edge.trunkX + dir * r} ${edge.trunkY}`;
-                    d += ` H ${edge.x2 - dir * r}`;
-                    d += ` Q ${edge.x2} ${edge.trunkY} ${edge.x2} ${edge.trunkY + r}`;
-                  }
-                  d += ` V ${edge.y2}`;
-
-                  return <path key={edge.id}
-                    d={d}
-                    fill="none"
-                    stroke={edgeColor(edge.type)}
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    opacity={opacity}
-                  />;
-                })}
-              </g>
-
-              {/* Nodes */}
-              <g>
-                {layout.nodes.filter(node => !node.mergedIntoPartner).map(node => {
-                  const relevantIds = node.partnerId ? [node.id, node.partnerId] : [node.id];
-                  const opacity = (!searchTerm || relevantIds.some(id => filteredIds.has(id))) ? 1 : 0.15;
-                  return (
-                    <g key={node.id} opacity={opacity}>
-                      <NodeCard
-                        member={node}
-                        selectedId={selectedNode?.id}
-                        onSelectId={selectNodeById}
-                        minimal={filters.minimalView}
-                      />
-                    </g>
-                  );
-                })}
-              </g>
-            </svg>
+          {!loading && treeData.members.length > 0 && (
+            <RecursiveTree
+              members={treeData.members}
+              relationships={treeData.relationships}
+              filters={filters}
+              searchTerm={searchTerm}
+              selectedMember={selectedNode}
+              onMemberSelect={setSelectedNode}
+              exportRef={exportRef}
+            />
           )}
         </div>
 
@@ -1559,7 +1497,7 @@ export default function FamilyTree() {
           </div>,
           document.body
         )}
-      </div>
+      </div>{/* end family-tree-main-content */}
 
       <MemberFormModal
         open={modalOpen}

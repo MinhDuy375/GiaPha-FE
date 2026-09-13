@@ -8,9 +8,36 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
+    const checkTokens = () => {
+      const token = localStorage.getItem('accessToken');
+      const refresh = localStorage.getItem('refreshToken');
+      if (!token) return false;
+      
+      const parseJwt = (t) => {
+        try { return JSON.parse(atob(t.split('.')[1])); }
+        catch (e) { return null; }
+      };
+      
+      const payload = parseJwt(token);
+      const refPayload = parseJwt(refresh);
+      const now = Date.now();
+      
+      if (payload && payload.exp * 1000 < now) {
+        if (!refresh || (refPayload && refPayload.exp * 1000 < now)) {
+          return false;
+        }
+      }
+      return true;
+    };
+
+    if (!checkTokens()) {
+      authService.logout();
+      setUser(null);
+    } else {
+      const currentUser = authService.getCurrentUser();
+      if (currentUser) {
+        setUser(currentUser);
+      }
     }
     setLoading(false);
   }, []);
