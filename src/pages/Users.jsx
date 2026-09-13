@@ -178,6 +178,9 @@ export default function Users() {
             <p className="section-sub">Danh sách tài khoản trong dòng họ hiện tại.</p>
           </div>
           <div className="content-header-actions">
+            <button className="btn btn-secondary btn-sm" type="button" onClick={() => setFilterOpen(!filterOpen)}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><IconSearch />Lọc</span>
+            </button>
             <button className="btn btn-secondary btn-sm" onClick={load} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <IconRefresh /> Làm mới
             </button>
@@ -187,17 +190,15 @@ export default function Users() {
         {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
         {message && <div className="alert alert-success" style={{ marginBottom: 16 }}>{message}</div>}
 
-        <div className="card" style={{ padding: 14, marginBottom: 16, overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <button className="btn btn-secondary btn-sm" type="button" onClick={() => setFilterOpen(!filterOpen)}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><IconSearch />Lọc</span>
-            </button>
+        {(search || filterStatus !== 'all') && (
+          <div style={{ padding: '0 0 16px 0', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ color: 'var(--color-text-muted)', fontSize: '.84rem' }}>
-              {search ? `Từ khóa: ${search}` : 'Tất cả'}
+              Đang lọc:
+              {search ? ` Từ khóa "${search}"` : ''}
               {filterStatus !== 'all' ? ` · ${filterStatus === 'active' ? 'Hoạt động' : 'Đã khóa'}` : ''}
             </span>
           </div>
-        </div>
+        )}
 
         <FilterPanel open={filterOpen} onClose={() => setFilterOpen(false)} onReset={resetFilter} onApply={applyFilter}>
           <div className="filter-grid">

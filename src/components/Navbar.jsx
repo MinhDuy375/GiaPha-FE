@@ -141,11 +141,16 @@ export default function Navbar({ children }) {
             <div style={{ position: 'relative' }} ref={menuRef}>
               <div
                 className="navbar-user"
-                style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: 8, transition: 'background 0.2s', background: menuOpen ? 'var(--color-surface-2)' : 'transparent' }}
+                style={{ cursor: 'pointer', padding: '4px 12px', borderRadius: 8, transition: 'background 0.2s', background: menuOpen ? 'var(--color-surface-2)' : 'transparent', display: 'flex', alignItems: 'center', gap: 10 }}
                 onClick={() => setMenuOpen(!menuOpen)}
               >
                 <div className="navbar-avatar" aria-label={"User " + (user?.fullName || user?.username)}>
                   {(user?.fullName || user?.username)?.charAt(0).toUpperCase()}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', display: window.innerWidth <= 1024 ? 'none' : 'flex' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.2 }}>
+                    {user?.fullName || user?.username}
+                  </span>
                 </div>
               </div>
 
@@ -156,10 +161,14 @@ export default function Navbar({ children }) {
                   borderRadius: 'var(--radius-lg)', boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
                   width: 220, zIndex: 100, overflow: 'hidden'
                 }}>
-                  <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div className="navbar-avatar" aria-label={"User " + (user?.fullName || user?.username)}>
+                  <div style={{ padding: '16px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface-2)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="navbar-avatar" style={{ width: 48, height: 48, fontSize: '1.2rem', marginBottom: 12 }} aria-label={"User " + (user?.fullName || user?.username)}>
                       {(user?.fullName || user?.username)?.charAt(0).toUpperCase()}
                     </div>
+                    <div style={{ fontWeight: 700, color: 'var(--color-text-primary)', fontSize: '0.95rem' }}>
+                      {user?.fullName || user?.username}
+                    </div>
+                    {user?.email && <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: 2 }}>{user.email}</div>}
                   </div>
                   <div style={{ padding: 4 }}>
                     <button

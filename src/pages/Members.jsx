@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import memberService from '../services/memberService';
 import { useFamilyTree } from '../contexts/FamilyTreeContext';
 import { MemberFormModal } from './FamilyTree';
+import MemberViewModal from '../components/MemberViewModal';
 import { formatMemberLunarDate } from '../utils/lunarCalendar';
 import { exportMembersToExcel } from '../utils/excelUtils';
 import { API_ORIGIN } from '../services/api';
@@ -25,6 +26,11 @@ const IconPlus = () => (
         <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
     </svg>
 );
+const IconDownload = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+);
 
 export default function Members() {
     const navigate = useNavigate();
@@ -44,6 +50,8 @@ export default function Members() {
     const [modalOpen, setModalOpen] = useState(false);
     const [editingMember, setEditingMember] = useState(null);
     const [selectedMember, setSelectedMember] = useState(null);
+    const [relationships, setRelationships] = useState([]);
+    const [nodeById, setNodeById] = useState(new Map());
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 10;
 
@@ -51,7 +59,11 @@ export default function Members() {
         setLoading(true);
         setError('');
         try {
-            setMembers(await memberService.getMembers());
+            const membersList = await memberService.getMembers();
+            setMembers(membersList);
+            const treeData = await memberService.getTreeData();
+            setRelationships(treeData.relationships || []);
+            setNodeById(new Map((treeData.members || []).map(m => [String(m.id), m])));
         } catch (exception) {
             setError(exception.response?.data?.message || 'Không thể tải danh sách thành viên.');
         } finally {
@@ -79,6 +91,50 @@ export default function Members() {
     useEffect(() => {
         setCurrentPage(1);
     }, [search, gender, status, sortBy]);
+
+    const { parents: selectedParents, spouses: selectedSpouses, descendantStats } = useMemo(() => {
+        if (!selectedMember || !relationships.length) return { parents: [], spouses: [], descendantStats: null };
+
+        const rels = relationships.filter(r => r.person_a === selectedMember.id || r.person_b === selectedMember.id);
+        const parents = rels.filter(r => r.type === 'parent' && r.person_b === selectedMember.id);
+        const children = rels.filter(r => r.type === 'parent' && r.person_a === selectedMember.id);
+        const spouses = rels.filter(r => r.type === 'marriage');
+
+        const childIds = children.map(r => r.person_b);
+        const childNodes = childIds.map(id => nodeById.get(String(id))).filter(Boolean);
+        const sonCount = childNodes.filter(c => c.gender === 'male').length;
+        const daughterCount = childNodes.filter(c => c.gender === 'female').length;
+
+        const spousesOfChildren = relationships.filter(r => r.type === 'marriage' && (childIds.includes(r.person_a) || childIds.includes(r.person_b)));
+        const daughtersInLaw = spousesOfChildren.filter(r => {
+            const spId = childIds.includes(r.person_a) ? r.person_b : r.person_a;
+            return nodeById.get(String(spId))?.gender === 'female';
+        }).length;
+        const sonsInLaw = spousesOfChildren.filter(r => {
+            const spId = childIds.includes(r.person_a) ? r.person_b : r.person_a;
+            return nodeById.get(String(spId))?.gender === 'male';
+        }).length;
+
+        const grandChildRelations = relationships.filter(r => r.type === 'parent' && childIds.includes(r.person_a));
+        let paternalGrandchildren = 0;
+        let maternalGrandchildren = 0;
+        grandChildRelations.forEach(r => {
+            const parentNode = nodeById.get(String(r.person_a));
+            if (parentNode?.gender === 'male') paternalGrandchildren++;
+            else if (parentNode?.gender === 'female') maternalGrandchildren++;
+        });
+
+        return {
+            parents,
+            spouses,
+            descendantStats: {
+                totalChildren: sonCount + daughterCount,
+                sonCount, daughterCount,
+                daughtersInLaw, sonsInLaw,
+                paternalGrandchildren, maternalGrandchildren
+            }
+        };
+    }, [selectedMember, relationships, nodeById]);
 
     const resetFilter = () => {
         setDraftSearch('');
@@ -161,24 +217,62 @@ export default function Members() {
     };
 
     return (
-        <div className="page">
+        <div className="page members-page-container">
+            <style dangerouslySetInnerHTML={{__html: `
+                .members-header-row {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 24px;
+                    flex-wrap: wrap;
+                    gap: 16px;
+                }
+                .members-header-actions {
+                    display: flex;
+                    gap: 10px;
+                }
+                @media (max-width: 1024px) {
+                    .desktop-only { display: none !important; }
+                    .members-header-actions .btn { padding: 0 10px; }
+                }
+            `}} />
             <Navbar />
 
             <main className="page-content">
-                <div className="content-header-row"><div className="section-header"><h1 className="section-title">Danh sách thành viên</h1><p className="section-sub">Tra cứu và quản lý hồ sơ trong dòng họ hiện tại.</p></div><div className="content-header-actions"><div style={{ display: 'inline-flex', padding: 3, gap: 2, background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 8 }} role="tablist" aria-label="Chuyển chế độ xem"><button className="btn btn-ghost btn-sm" onClick={() => navigate('/family-tree')}>Cây</button><button className="btn btn-sm" style={{ background: 'var(--color-primary)', color: '#fff', border: 0 }} aria-selected="true">Danh sách</button></div><button className="btn btn-secondary btn-sm" onClick={loadMembers}><IconRefresh /> Làm mới</button><button className="btn btn-primary btn-sm" disabled={!hasPermission('member_list.create')} onClick={() => setModalOpen(true)}><IconPlus /> Thêm thành viên</button><button className="btn btn-secondary btn-sm" disabled={!hasPermission('tree_view.export')} onClick={exportExcel}>Xuất Excel</button></div></div>
-
-                <div className="card members-filter-card" style={{ padding: 16, marginBottom: 20, overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <div className="members-header-row">
+                    <div className="section-header" style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 0 }}>
+                        <h1 className="section-title" style={{ marginBottom: 0 }}>Danh sách thành viên</h1>
+                        <div style={{ display: 'inline-flex', padding: 3, gap: 2, background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 8 }} role="tablist">
+                            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/family-tree')}>Cây</button>
+                            <button className="btn btn-sm" style={{ background: 'var(--color-primary)', color: '#fff', border: 0 }} aria-selected="true">Danh sách</button>
+                        </div>
+                    </div>
+                    <div className="members-header-actions">
                         <button className="btn btn-secondary btn-sm" type="button" onClick={() => setFilterOpen(!filterOpen)}>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><IconSearch />Lọc</span>
+                            <IconSearch /><span className="desktop-only">Lọc</span>
                         </button>
+                        <button className="btn btn-primary btn-sm" disabled={!hasPermission('member_list.create')} onClick={() => setModalOpen(true)}>
+                            <IconPlus /> <span className="desktop-only">Thêm mới</span>
+                        </button>
+                        <button className="btn btn-secondary btn-sm" disabled={!hasPermission('tree_view.export')} onClick={exportExcel}>
+                            <IconDownload /> <span className="desktop-only">Xuất</span>
+                        </button>
+                        <button className="btn btn-secondary btn-sm" onClick={loadMembers}>
+                            <IconRefresh /> <span className="desktop-only">Làm mới</span>
+                        </button>
+                    </div>
+                </div>
+
+                {(search || gender !== 'all' || status !== 'all') && (
+                    <div style={{ padding: '0 0 16px 0', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <span style={{ color: 'var(--color-text-muted)', fontSize: '.84rem' }}>
-                            {search ? `Từ khóa: ${search}` : 'Tất cả'}
+                            Đang lọc: 
+                            {search ? ` Từ khóa "${search}"` : ''}
                             {gender !== 'all' ? ` · ${gender === '0' ? 'Nam' : gender === '1' ? 'Nữ' : 'Khác'}` : ''}
                             {status !== 'all' ? ` · ${status === 'alive' ? 'Còn sống' : 'Đã mất'}` : ''}
                         </span>
                     </div>
-                </div>
+                )}
 
                 <FilterPanel open={filterOpen} onClose={() => setFilterOpen(false)} onReset={resetFilter} onApply={applyFilter}>
                     <div className="filter-grid">
@@ -213,10 +307,18 @@ export default function Members() {
                         <>
                             <table className="members-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
                                 <thead><tr style={{ textAlign: 'left', borderBottom: '1px solid var(--color-border)' }}>
-                                    <th style={{ padding: '14px 16px' }}>Thành viên</th><th style={{ padding: '14px 16px' }}>Giới tính</th><th style={{ padding: '14px 16px' }}>Đời</th><th style={{ padding: '14px 16px' }}>Sinh - mất</th><th style={{ padding: '14px 16px' }}>Nghề nghiệp</th><th style={{ padding: '14px 16px' }}>Ghi chú</th><th style={{ padding: '14px 16px' }}>Thao tác</th>
+                                    <th style={{ padding: '14px 16px', width: 60 }}>STT</th><th style={{ padding: '14px 16px' }}>Thành viên</th><th style={{ padding: '14px 16px' }}>Giới tính</th><th style={{ padding: '14px 16px' }}>Đời</th><th style={{ padding: '14px 16px' }}>Sinh - mất</th><th style={{ padding: '14px 16px' }}>Nghề nghiệp</th><th style={{ padding: '14px 16px' }}>Ghi chú</th><th style={{ padding: '14px 16px' }}>Thao tác</th>
                                 </tr></thead>
-                                <tbody>{paginatedMembers.map(member => <tr key={member.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                                    <td style={{ padding: '13px 16px', fontWeight: 700 }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 34, height: 34, borderRadius: '50%', overflow: 'hidden', background: 'var(--color-surface-2)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>{member.avatarUrl ? <img src={member.avatarUrl.startsWith('http') ? member.avatarUrl : `${API_ORIGIN}${member.avatarUrl}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : member.fullName?.slice(0, 1)}</div><span>{member.fullName}</span></div></td>
+                                <tbody>{paginatedMembers.map((member, index) => <tr key={member.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                                    <td style={{ padding: '13px 16px', color: 'var(--color-text-muted)' }}>{startIndex + index + 1}</td>
+                                    <td style={{ padding: '13px 16px', fontWeight: 700 }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 34, height: 34, borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+                                      <img
+                                        src={member.avatarUrl ? (member.avatarUrl.startsWith('http') ? member.avatarUrl : `${API_ORIGIN}${member.avatarUrl}`) : (member.gender === 1 ? '/women.jpg' : '/man.jpg')}
+                                        alt=""
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                        onError={(e) => { e.currentTarget.src = member.gender === 1 ? '/women.jpg' : '/man.jpg'; }}
+                                      />
+                                    </div><span>{member.fullName}</span></div></td>
                                     <td style={{ padding: '13px 16px' }}>{member.gender === 0 ? 'Nam' : member.gender === 1 ? 'Nữ' : 'Khác'}</td>
                                     <td style={{ padding: '13px 16px' }}>{member.generationLevel || 'Không rõ'}</td>
                                     <td style={{ padding: '13px 16px' }}>{member.birthYear || '?'} - {member.deathYear || (member.isAlive ? 'nay' : '?')}</td>
@@ -242,7 +344,18 @@ export default function Members() {
             </main>
             <MemberFormModal open={modalOpen} onClose={() => setModalOpen(false)} onSave={handleCreate} members={members} editingMember={null} />
             <MemberFormModal open={Boolean(editingMember)} onClose={() => setEditingMember(null)} onSave={handleSave} members={members} editingMember={editingMember} />
-            {selectedMember && <div className="modal-overlay" role="dialog" aria-modal="true" onClick={event => event.target === event.currentTarget && setSelectedMember(null)}><div className="modal"><div className="modal-header"><h2 className="modal-title">Thông tin thành viên</h2><button className="btn btn-ghost btn-sm" onClick={() => setSelectedMember(null)}>✕</button></div><div className="modal-body"><h3>{selectedMember.fullName}</h3><p>Đời {selectedMember.generationLevel || 'không rõ'} · {selectedMember.gender === 0 ? 'Nam' : selectedMember.gender === 1 ? 'Nữ' : 'Khác'}</p><p>Sinh: {selectedMember.birthYear || 'không rõ'} · {selectedMember.isAlive ? 'Còn sống' : `Mất: ${selectedMember.deathYear || 'không rõ'}`}</p><p>{selectedMember.biography || 'Chưa có tiểu sử.'}</p><button className="btn btn-primary" onClick={() => { setEditingMember(selectedMember); setSelectedMember(null); }}>Sửa thông tin</button></div></div></div>}
+            <MemberViewModal 
+                open={Boolean(selectedMember)} 
+                onClose={() => setSelectedMember(null)} 
+                member={selectedMember} 
+                showFamily={true} 
+                descendantStats={descendantStats}
+                parents={selectedParents}
+                spouses={selectedSpouses}
+                nodeById={nodeById}
+                onEdit={m => { setEditingMember(m); setSelectedMember(null); }} 
+                hasManagePermission={hasPermission('member_list.edit')} 
+            />
         </div>
     );
 }

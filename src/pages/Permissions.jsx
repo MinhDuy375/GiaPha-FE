@@ -388,189 +388,71 @@ export default function Permissions() {
             Đang tải dữ liệu phân quyền...
           </div>
         ) : (
-          <div className="permissions-layout">
-            {/* Left Panel: Role Groups */}
-            <div className="card permissions-group-panel">
-              <div className="permissions-group-heading">
-                <div className="permissions-group-heading-text">
-                  Nhóm quyền ({roleGroups.length})
-                </div>
-              </div>
-              <div className="permissions-group-list">
-                {roleGroups.map(g => (
-                  <div
-                    key={g.id}
-                    onClick={() => setSelectedGroup(g)}
-                    id={`rg-item-${g.id}`}
-                    className={`permissions-role-group ${selectedGroup?.id === g.id ? 'permissions-role-group-active' : ''}`}
-                  >
-                    <div className={`permissions-role-icon ${selectedGroup?.id === g.id ? 'permissions-role-icon-active' : ''}`}>
-                      <IconShield />
-                    </div>
-                    <div className="permissions-role-content">
-                      <div className="permissions-role-name">
-                        {g.name}
-                      </div>
-                      <div className="permissions-role-count">
-                        {g.permissions.length} quyền
-                      </div>
-                    </div>
-                    {canManage && (
-                      <div className="permissions-role-actions" onClick={e => e.stopPropagation()}>
-                        <button
-                          onClick={() => handleOpenEdit(g)}
-                          title="Chỉnh sửa"
-                          className="permissions-group-button permissions-edit-button"
-                          id={`btn-edit-${g.id}`}
-                        ><IconEdit /></button>
-                        <button
-                          onClick={() => setDeleteConfirm(g)}
-                          title="Xóa"
-                          className="permissions-group-button permissions-delete-button"
-                          id={`btn-delete-${g.id}`}
-                        ><IconTrash /></button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {roleGroups.length === 0 && (
-                  <div className="permissions-empty-group">
-                    Chưa có nhóm quyền nào.
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Right Panel: Permission Matrix view */}
-            <div className="permissions-detail-panel">
-              {selectedGroup ? (
-                <div className="card permissions-detail-card">
-                  <div className="permissions-detail-header">
-                    <div>
-                      <div className="permissions-selected-group-name">{selectedGroup.name}</div>
-                      {selectedGroup.description && (
-                        <div className="permissions-selected-group-description">{selectedGroup.description}</div>
-                      )}
-                    </div>
-                    <div className="permissions-detail-header-actions">
-                      <span className="permissions-count-badge">
-                        {selectedGroup.permissions.length} quyền
-                      </span>
+            <div className="card" style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--color-border)' }}>
+                    <th style={{ padding: '12px 16px', fontWeight: 700, width: 250 }}>Tên nhóm quyền</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700 }}>Mô tả</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700, width: 120, textAlign: 'center' }}>Số quyền hạn</th>
+                    {canManage && <th style={{ padding: '12px 16px', fontWeight: 700, width: 100, textAlign: 'center' }}>Thao tác</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {roleGroups.map(g => (
+                    <tr key={g.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background 0.15s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-alt)'}
+                      onMouseLeave={e => e.currentTarget.style.background = ''}>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(var(--color-primary-rgb, 180,80,30),0.1)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <IconShield />
+                          </div>
+                          <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{g.name}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px 16px', color: 'var(--color-text-secondary)' }}>
+                        {g.description || <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Chưa có mô tả</span>}
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <span className="chip" style={{ background: 'var(--color-surface-2)', color: 'var(--color-text-primary)' }}>
+                          {g.permissions.length} quyền
+                        </span>
+                      </td>
                       {canManage && (
-                        <button className="btn btn-secondary btn-sm" onClick={() => handleOpenEdit(selectedGroup)} id="btn-edit-selected">
-                          <IconEdit /> Chỉnh sửa
-                        </button>
+                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              title="Chỉnh sửa"
+                              onClick={() => handleOpenEdit(g)}
+                              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 32, minHeight: 32, padding: '4px 8px' }}
+                            >
+                              <IconEdit />
+                            </button>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              title="Xóa"
+                              onClick={() => setDeleteConfirm(g)}
+                              style={{ color: 'var(--color-error)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 32, minHeight: 32, padding: '4px 8px' }}
+                            >
+                              <IconTrash />
+                            </button>
+                          </div>
+                        </td>
                       )}
-                    </div>
-                  </div>
-
-                  {/* Matrix table */}
-                  <div className="permissions-matrix-scroll">
-                    <table className="permissions-matrix-table">
-                      <thead>
-                        <tr style={{ background: 'var(--color-surface-2)' }}>
-                          <th style={{ padding: '12px 20px', textAlign: 'left', fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--color-border)', width: 200 }}>
-                            Module / Màn hình
-                          </th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--color-border)' }}>Xem</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--color-border)' }}>Thêm</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--color-border)' }}>Sửa</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--color-border)' }}>Xóa</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--color-border)' }}>Khác</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {matrix.map((mod, mi) => (
-                          <React.Fragment key={mod.id}>
-                            {/* Module row */}
-                            <tr>
-                              <td colSpan={6} style={{
-                                padding: '10px 20px',
-                                background: 'rgba(var(--color-primary-rgb,180,80,30),0.06)',
-                                fontSize: '0.8rem', fontWeight: 700,
-                                color: 'var(--color-primary)',
-                                textTransform: 'uppercase', letterSpacing: '0.06em',
-                                borderBottom: '1px solid var(--color-border)',
-                              }}>
-                                {mod.name}
-                              </td>
-                            </tr>
-                            {/* Menu rows */}
-                            {mod.menus.map((menu, ri) => {
-                              const findPerm = (suffix) => menu.permissions.find(p => p.code.endsWith(suffix));
-                              const viewP = findPerm('.view');
-                              const createP = findPerm('.create');
-                              const editP = findPerm('.edit');
-                              const deleteP = findPerm('.delete');
-                              const otherPerms = menu.permissions.filter(p =>
-                                !p.code.endsWith('.view') && !p.code.endsWith('.create') &&
-                                !p.code.endsWith('.edit') && !p.code.endsWith('.delete')
-                              );
-                              const rowBg = ri % 2 === 0 ? 'transparent' : 'var(--color-surface-2)';
-
-                              const PermCell = ({ perm }) => (
-                                <td style={{ padding: '12px 16px', textAlign: 'center', background: rowBg, borderBottom: '1px solid var(--color-border)' }}>
-                                  {perm ? (
-                                    <div style={{
-                                      width: 24, height: 24, borderRadius: 6, margin: '0 auto',
-                                      background: selectedPermsSet.has(perm.code) ? 'var(--color-primary)' : 'var(--color-surface)',
-                                      border: `2px solid ${selectedPermsSet.has(perm.code) ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                      color: '#fff',
-                                    }}>
-                                      {selectedPermsSet.has(perm.code) && <IconCheck />}
-                                    </div>
-                                  ) : (
-                                    <div style={{ color: 'var(--color-border)', fontSize: '1rem', textAlign: 'center' }}>—</div>
-                                  )}
-                                </td>
-                              );
-
-                              return (
-                                <tr key={menu.id}>
-                                  <td style={{ padding: '12px 20px 12px 32px', fontSize: '0.875rem', fontWeight: 500, color: 'var(--color-text-primary)', background: rowBg, borderBottom: '1px solid var(--color-border)' }}>
-                                    {menu.name}
-                                  </td>
-                                  <PermCell perm={viewP} />
-                                  <PermCell perm={createP} />
-                                  <PermCell perm={editP} />
-                                  <PermCell perm={deleteP} />
-                                  <td style={{ padding: '12px 16px', textAlign: 'center', background: rowBg, borderBottom: '1px solid var(--color-border)' }}>
-                                    {otherPerms.length > 0 ? (
-                                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
-                                        {otherPerms.map(op => (
-                                          <span key={op.id} style={{
-                                            padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600,
-                                            background: selectedPermsSet.has(op.code) ? 'var(--color-primary)' : 'var(--color-surface)',
-                                            border: `1px solid ${selectedPermsSet.has(op.code) ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                                            color: selectedPermsSet.has(op.code) ? '#fff' : 'var(--color-text-muted)',
-                                          }}>
-                                            {op.name}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    ) : <span style={{ color: 'var(--color-border)' }}>—</span>}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </React.Fragment>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : (
-                <div className="card" style={{ padding: '60px 24px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: 12 }}>🛡️</div>
-                  <div style={{ color: 'var(--color-text-muted)', fontSize: '0.95rem' }}>
-                    Chọn một nhóm quyền ở bên trái để xem chi tiết phân quyền.
-                  </div>
-                </div>
-              )}
+                    </tr>
+                  ))}
+                  {roleGroups.length === 0 && (
+                    <tr>
+                      <td colSpan={canManage ? 4 : 3} style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                        Chưa có nhóm quyền nào.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-          </div>
         )}
       </main>
 
