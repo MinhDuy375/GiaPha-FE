@@ -44,7 +44,7 @@ export function MemberFormModal({ open, onClose, onSave, members, editingMember 
     birthDateLunar: '', birthLunarYear: '', birthLunarMonth: '', birthLunarDay: '',
     deathDateLunar: '', deathLunarYear: '', deathLunarMonth: '', deathLunarDay: '',
     isAlive: true, isInLaw: false, birthOrder: '', biography: '', note: '', generationLevel: 1,
-    phoneNumber: '', occupation: '', currentResidence: '', avatarUrl: '',
+    phoneNumber: '', occupation: '', currentResidence: '', avatarUrl: '', burialLocation: '',
     fatherId: '', motherId: '', spouseId: ''
   });
   const [saving, setSaving] = useState(false);
@@ -82,12 +82,13 @@ export function MemberFormModal({ open, onClose, onSave, members, editingMember 
           phoneNumber: editingMember.phone_number || '',
           occupation: editingMember.occupation || '',
           currentResidence: editingMember.current_residence || '',
+          burialLocation: editingMember.burialLocation || editingMember.burial_location || '',
           avatarUrl: editingMember.avatar_url || '',
           generationLevel: editingMember.generation || 1,
           fatherId: '', motherId: '', spouseId: ''
         });
       } else {
-        setForm({ fullName: '', tabooName: '', courtesyName: '', otherNames: '', gender: 0, birthYear: '', birthMonth: '', birthDay: '', deathYear: '', deathMonth: '', deathDay: '', birthDateLunar: '', birthLunarYear: '', birthLunarMonth: '', birthLunarDay: '', deathDateLunar: '', deathLunarYear: '', deathLunarMonth: '', deathLunarDay: '', isAlive: true, isInLaw: false, birthOrder: '', biography: '', note: '', generationLevel: 1, phoneNumber: '', occupation: '', currentResidence: '', avatarUrl: '', fatherId: '', motherId: '', spouseId: '' });
+        setForm({ fullName: '', tabooName: '', courtesyName: '', otherNames: '', gender: 0, birthYear: '', birthMonth: '', birthDay: '', deathYear: '', deathMonth: '', deathDay: '', birthDateLunar: '', birthLunarYear: '', birthLunarMonth: '', birthLunarDay: '', deathDateLunar: '', deathLunarYear: '', deathLunarMonth: '', deathLunarDay: '', isAlive: true, isInLaw: false, birthOrder: '', biography: '', note: '', generationLevel: 1, phoneNumber: '', occupation: '', currentResidence: '', avatarUrl: '', burialLocation: '', fatherId: '', motherId: '', spouseId: '' });
       }
       setError('');
       setAvatarFile(null);
@@ -166,6 +167,7 @@ export function MemberFormModal({ open, onClose, onSave, members, editingMember 
         phoneNumber: form.phoneNumber || null,
         occupation: form.occupation || null,
         currentResidence: form.currentResidence || null,
+        burialLocation: form.burialLocation || null,
         avatarUrl: form.avatarUrl || null,
         avatarFile,
         generationLevel,
@@ -359,6 +361,45 @@ export function MemberFormModal({ open, onClose, onSave, members, editingMember 
               <input style={{ ...inputStyle, gridColumn: '1 / -1' }} value={form.currentResidence} onChange={e => update('currentResidence', e.target.value)} placeholder="Nơi ở hiện tại" />
             </div>
           </div>
+
+          {!form.isAlive && (
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--color-border)' }}>
+              <div style={{ ...labelStyle, marginBottom: 10, color: 'var(--color-text-muted)' }}>Nơi an táng</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  style={{ ...inputStyle, flex: 1 }}
+                  value={form.burialLocation}
+                  onChange={e => update('burialLocation', e.target.value)}
+                  placeholder="Link Google Maps hoặc tọa độ (VD: 10.7769, 106.7009)..."
+                />
+                {form.burialLocation && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const val = form.burialLocation.trim();
+                      // Nếu là tọa độ dạng "lat, lng"
+                      const coordMatch = val.match(/^(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)$/);
+                      const url = coordMatch
+                        ? `https://www.google.com/maps?q=${coordMatch[1]},${coordMatch[2]}`
+                        : val.startsWith('http') ? val : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(val)}`;
+                      window.open(url, '_blank', 'noopener');
+                    }}
+                    style={{
+                      flexShrink: 0, height: 40, padding: '0 14px', borderRadius: 8,
+                      background: '#4285f4', color: '#fff', border: 'none', cursor: 'pointer',
+                      fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6,
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    🗺️ Mở Maps
+                  </button>
+                )}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 5 }}>
+                Nhập link Google Maps, link bản đồ khác hoặc tọa độ GPS (lat, lng).
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
