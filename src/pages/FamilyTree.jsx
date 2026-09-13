@@ -971,14 +971,12 @@ export default function FamilyTree() {
         }
         .ft-toolbar-card {
           width: 100%;
-          max-width: 480px;
           background: #FFFFFF;
           border: 1px solid #E7DED4;
           border-radius: 20px;
-          padding: 14px 16px;
+          padding: 12px 16px;
           box-shadow: 0 4px 20px rgba(43, 33, 27, 0.05);
           display: flex;
-          flex-direction: column;
           gap: 12px;
         }
         .ft-toolbar-row {
@@ -986,8 +984,38 @@ export default function FamilyTree() {
           align-items: center;
           justify-content: space-between;
           gap: 10px;
-          width: 100%;
         }
+
+        /* Hiển thị Responsive cho Toolbar */
+        @media (min-width: 768px) {
+          .ft-toolbar-card {
+            max-width: 860px;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 18px;
+          }
+          .ft-toolbar-row {
+            width: auto;
+            flex: 1;
+          }
+        }
+
+        @media (max-width: 767px) {
+          .ft-toolbar-wrapper {
+            padding: 12px 12px 4px 12px;
+          }
+          .ft-toolbar-card {
+            max-width: 480px;
+            flex-direction: column;
+            border-radius: 18px;
+            padding: 12px;
+          }
+          .ft-toolbar-row {
+            width: 100%;
+          }
+        }
+
         .ft-zoom-container {
           display: flex;
           align-items: center;
@@ -1063,23 +1091,12 @@ export default function FamilyTree() {
           border-radius: 12px;
           box-shadow: 0 12px 32px rgba(43, 33, 27, 0.12);
         }
-
-        /* Mobile Adjustments */
-        @media (max-width: 640px) {
-          .ft-toolbar-wrapper {
-            padding: 12px 12px 4px 12px;
-          }
-          .ft-toolbar-card {
-            border-radius: 18px;
-            padding: 12px;
-          }
-        }
       `}</style>
 
       {/* ─── TOOLBAR CARD ─── */}
       <div className="ft-toolbar-wrapper">
         <div className="ft-toolbar-card">
-          {/* Hàng 1: Nút Mở danh sách | Cụm [- 100% +] | Nút Filter */}
+          {/* Cụm 1: Nút Mở danh sách | Phóng to - Thu nhỏ | Bộ lọc */}
           <div className="ft-toolbar-row">
             <button className="ft-btn-icon" onClick={() => setLeftPanelOpen(v => !v)} title="Danh sách & tra danh xưng">
               <IconList />
@@ -1165,7 +1182,7 @@ export default function FamilyTree() {
             </div>
           </div>
 
-          {/* Hàng 2: Nút Xuất file (Trái) | Segmented Control Cây / Danh sách (Giữa) | Nút Thêm mới (Phải) */}
+          {/* Cụm 2: Nút Xuất file | Switch Cây - Danh sách | Nút Thêm mới */}
           <div className="ft-toolbar-row">
             <div style={{ position: 'relative' }}>
               <button className="ft-btn-icon" disabled={!hasPermission('tree_view.export')} onClick={() => setExportOpen(v => !v)} title="Xuất cây gia phả">

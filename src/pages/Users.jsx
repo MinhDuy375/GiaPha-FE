@@ -6,30 +6,34 @@ import Navbar from '../components/Navbar';
 import FilterPanel from '../components/FilterPanel';
 
 const IconSearch = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', flexShrink: 0 }}>
     <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
 );
+
 const IconRefresh = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', flexShrink: 0 }}>
     <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
     <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
   </svg>
 );
+
 const IconEdit = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', flexShrink: 0 }}>
     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
   </svg>
 );
+
 const IconTrash = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', flexShrink: 0 }}>
     <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
     <path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
   </svg>
 );
+
 const IconClose = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', flexShrink: 0 }}>
     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
@@ -174,7 +178,9 @@ export default function Users() {
             <p className="section-sub">Danh sách tài khoản trong dòng họ hiện tại.</p>
           </div>
           <div className="content-header-actions">
-            <button className="btn btn-secondary btn-sm" onClick={load}><IconRefresh /> Làm mới</button>
+            <button className="btn btn-secondary btn-sm" onClick={load} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <IconRefresh /> Làm mới
+            </button>
           </div>
         </div>
 
@@ -245,16 +251,32 @@ export default function Users() {
                         {u.isActive ? 'Hoạt động' : 'Đã khóa'}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 16px' }}>
+                    <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <button className="btn btn-secondary btn-sm" disabled={!canManage} title="Đổi vai trò" onClick={() => setEditingUser(u)}>
+                        <button 
+                          className="btn btn-secondary btn-sm" 
+                          disabled={!canManage} 
+                          title="Đổi vai trò" 
+                          onClick={() => setEditingUser(u)}
+                          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 32, minHeight: 32, padding: '4px 8px' }}
+                        >
                           <IconEdit />
                         </button>
-                        <button className="btn btn-secondary btn-sm" disabled={!canManage} onClick={() => handleToggleStatus(u)}
-                          style={{ color: u.isActive ? 'var(--color-warning)' : 'var(--color-success)', fontSize: '.8rem' }}>
+                        <button 
+                          className="btn btn-secondary btn-sm" 
+                          disabled={!canManage} 
+                          onClick={() => handleToggleStatus(u)}
+                          style={{ color: u.isActive ? 'var(--color-warning)' : 'var(--color-success)', fontSize: '.8rem', display: 'inline-flex', alignItems: 'center' }}
+                        >
                           {u.isActive ? 'Khóa' : 'Mở khóa'}
                         </button>
-                        <button className="btn btn-sm" disabled={!canManage} onClick={() => handleRemove(u)} style={{ color: 'var(--color-error)' }}>
+                        <button 
+                          className="btn btn-secondary btn-sm" 
+                          disabled={!canManage} 
+                          onClick={() => handleRemove(u)} 
+                          title="Xóa"
+                          style={{ color: 'var(--color-error)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 32, minHeight: 32, padding: '4px 8px' }}
+                        >
                           <IconTrash />
                         </button>
                       </div>
