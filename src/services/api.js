@@ -1,13 +1,15 @@
-﻿import axios from 'axios';
+import axios from 'axios';
+
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5082';
 
 const api = axios.create({
-  baseURL: 'http://localhost:5082/api',
+  baseURL: `${BASE_URL}/api`,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-export const API_ORIGIN = 'http://localhost:5082';
+export const API_ORIGIN = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5082';
 
 // Interceptor đính kèm Token vào Header của mọi request
 api.interceptors.request.use(
@@ -36,7 +38,7 @@ api.interceptors.response.use(
           throw new Error('No refresh token available');
         }
 
-        const response = await axios.post('http://localhost:5082/api/auth/refresh', {
+        const response = await axios.post(`${BASE_URL}/api/auth/refresh`, {
           refreshToken,
         });
 
