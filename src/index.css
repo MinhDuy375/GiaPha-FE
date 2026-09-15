@@ -788,9 +788,10 @@ a {
 .sidebar-item {
   width: 100%;
   min-height: 44px;
-  display: flex;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  column-gap: 12px;
   padding: 0 14px;
   border: 0;
   border-radius: var(--radius-md);
@@ -804,6 +805,7 @@ a {
 }
 
 .sidebar-item>span {
+  min-width: 0;
   overflow: hidden;
   max-width: 190px;
   white-space: nowrap;
@@ -883,6 +885,7 @@ a {
 }
 
 .sidebar-collapsed .sidebar-item {
+  display: flex;
   justify-content: center;
   padding-inline: 0;
 }
@@ -1152,7 +1155,20 @@ a {
   .sidebar-toggle {
     position: absolute;
     top: 18px;
-    right: -46px;
+    right: 14px;
+    left: auto !important;
+    z-index: 2;
+  }
+
+  .mobile-menu-icon-close {
+    position: absolute;
+    width: 22px;
+    height: 2px;
+    transform: rotate(45deg);
+  }
+
+  .mobile-menu-icon-close-second {
+    transform: rotate(-45deg);
   }
 
   .page-actions-inner {

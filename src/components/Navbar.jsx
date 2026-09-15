@@ -126,9 +126,9 @@ export default function Navbar({ children }) {
       <nav className="navbar" aria-label="Main navigation">
         <div className="navbar-inner">
           <div className="navbar-left">
-            <button className="mobile-menu-button" aria-label="Mở menu" onClick={mobileMenuOpen ? closeMobileDrawer : openMobileDrawer}>
+            <button className="mobile-menu-button" aria-label={mobileMenuOpen ? 'Thu gọn menu' : 'Mở menu'} onClick={mobileMenuOpen ? closeMobileDrawer : openMobileDrawer}>
               <span className="mobile-menu-icon">
-                <span /><span /><span />
+                {mobileMenuOpen ? <><span className="mobile-menu-icon-close" /><span className="mobile-menu-icon-close mobile-menu-icon-close-second" /></> : <><span /><span /><span /></>}
               </span>
             </button>
             <div className="navbar-brand" style={{ cursor: 'pointer' }} onClick={() => navigate('/')}>
@@ -147,7 +147,7 @@ export default function Navbar({ children }) {
                 <div className="navbar-avatar" aria-label={"User " + (user?.fullName || user?.username)}>
                   {(user?.fullName || user?.username)?.charAt(0).toUpperCase()}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', display: window.innerWidth <= 1024 ? 'none' : 'flex' }}>
+                <div style={{ flexDirection: 'column', display: window.innerWidth <= 1024 ? 'none' : 'flex' }}>
                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.2 }}>
                     {user?.fullName || user?.username}
                   </span>
