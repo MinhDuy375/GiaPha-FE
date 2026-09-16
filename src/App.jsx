@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { FamilyTreeProvider } from './contexts/FamilyTreeContext';
@@ -22,6 +21,7 @@ import Gallery from './pages/Gallery';
 import Membership from './pages/Membership';
 import Users from './pages/Users';
 import ImportExport from './pages/ImportExport';
+import ChatWidget from './components/ChatWidget';
 
 function App() {
   return (
@@ -134,6 +134,7 @@ function App() {
             {/* Fallback redirect */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          <ChatWidget />
         </Router>
       </FamilyTreeProvider>
     </AuthProvider>
