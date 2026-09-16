@@ -132,7 +132,7 @@ export default function Navbar({ children }) {
               </span>
             </button>
             <div className="navbar-brand" style={{ cursor: 'pointer' }} onClick={() => navigate('/')}>
-              <img src="/public/chimlactrans.png" alt="Logo" className="navbar-logo" style={{ width: '30px' }} />
+              <img src="/chimlactrans.png" alt="Logo" className="navbar-logo" style={{ width: '30px' }} />
               Lạc Việt
             </div>
           </div>
